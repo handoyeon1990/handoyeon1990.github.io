@@ -163,9 +163,9 @@
           <textarea id="remarks" placeholder="특이사항이 있으면 입력하세요. 없으면 비워두셔도 됩니다." style="min-height:90px"></textarea>
         </div>
         <div class="field">
-          <label for="writer">작성자</label>
-          <select id="writer">
-            <option value="">선택하세요</option>
+          <label for="writer">작성자 <span class="small">(운전자 및 작업자와 동일)</span></label>
+          <select id="writer" disabled>
+            <option value="">운전자 및 작업자를 선택하세요</option>
             <option value="강영우">강영우</option>
             <option value="김기범">김기범</option>
             <option value="이재철">이재철</option>
@@ -584,7 +584,7 @@ $("saveBtn").addEventListener("click", async ()=>{
     worker:$("worker").value,
     content:$("workContent").value.trim(),
     remarks:$("remarks").value.trim(),
-    writer:$("writer").value,
+    writer:$("worker").value,
     supervisor:"한도연"
   };
 
@@ -612,6 +612,9 @@ $("clearBtn").addEventListener("click",()=>clearInputs(true));
 
 $("startTime").addEventListener("change",calcDuration);
 $("endTime").addEventListener("change",calcDuration);
+$("worker").addEventListener("change",()=>{
+  $("writer").value=$("worker").value;
+});
 equipment.addEventListener("change",renderEquipment);
 $("place").addEventListener("change",renderEquipment);
 
@@ -663,7 +666,7 @@ function buildPrintSheet(data){
         </tr>
         <tr class="print-sign">
           <th>작성자</th>
-          <td>${escapeHtml(data.writer || "")}</td>
+          <td>${escapeHtml(data.worker || data.writer || "")}</td>
           <th>관리감독자</th>
           <td>${escapeHtml(data.supervisor || "")}</td>
         </tr>
@@ -751,7 +754,7 @@ window.loadRecord=id=>{
   const r=records().find(x=>x.id===id); if(!r)return;
   equipment.value=r.equipmentKey;
   $("workDate").value=r.date||"";$("place").value=r.place||"";$("startTime").value=r.start||"";$("endTime").value=r.end||"";
-  $("worker").value=r.worker||"";$("workContent").value=r.content||"";$("remarks").value=r.remarks||"";$("writer").value=r.writer||"";$("supervisor").value=r.supervisor||"한도연";
+  $("worker").value=r.worker||"";$("workContent").value=r.content||"";$("remarks").value=r.remarks||"";$("writer").value=r.worker||"";$("supervisor").value=r.supervisor||"한도연";
   renderEquipment();
   calcDuration();
   window.scrollTo({top:0,behavior:"smooth"});
@@ -781,7 +784,7 @@ $("refreshBtn").addEventListener("click", async ()=>{
 $("csvBtn").addEventListener("click",()=>{
   const arr=records(); if(!arr.length){alert("내보낼 기록이 없습니다.");return;}
   const headers=["날짜","장비","차량번호","작업장소","시작시간","종료시간","작업시간","운전자 및 작업자","작업내용","특이사항","작성자","관리감독자"];
-  const rows=arr.map(r=>[r.date,(EQUIPMENT[r.equipmentKey]||{}).name||r.equipment,(EQUIPMENT[r.equipmentKey]||{}).vehicleNo||r.vehicleNo,r.place,r.start,r.end,r.duration,r.worker,r.content,r.remarks||"",r.writer,r.supervisor]);
+  const rows=arr.map(r=>[r.date,(EQUIPMENT[r.equipmentKey]||{}).name||r.equipment,(EQUIPMENT[r.equipmentKey]||{}).vehicleNo||r.vehicleNo,r.place,r.start,r.end,r.duration,r.worker,r.content,r.remarks||"",r.worker||r.writer,r.supervisor]);
   const csv=[headers,...rows].map(row=>row.map(v=>`"${String(v??"").replace(/"/g,'""')}"`).join(",")).join("\n");
   const blob=new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8;"});
   const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`작업기록_${new Date().toISOString().slice(0,10)}.csv`;a.click();URL.revokeObjectURL(a.href);
