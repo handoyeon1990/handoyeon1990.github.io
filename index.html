@@ -63,38 +63,47 @@
   .route-source-note{font-size:11px;color:var(--muted);margin-top:6px}
   #printSheet{display:none}
   .print-doc{font-family:"Pretendard","Noto Sans KR","Apple SD Gothic Neo",sans-serif;color:#111;font-weight:400;letter-spacing:-0.01em}
-  .print-title{text-align:center;font-size:22px;font-weight:800;margin-bottom:8px;letter-spacing:-0.025em}
-  .print-meta,.print-table{width:100%;border-collapse:collapse;table-layout:fixed}
-  .print-meta th,.print-meta td,.print-table th,.print-table td{border:1px solid #555;padding:4px 5px;font-size:10px;vertical-align:middle;line-height:1.25}
-  .print-meta th,.print-table th{background:#f0f0f0;font-weight:600}
-  .print-section-title{font-weight:700;font-size:12px;margin:7px 0 3px}
-  .print-route{border:1px solid #555;padding:4px;margin-top:3px;text-align:center}
-  .print-route img{display:block;width:auto;max-width:100%;max-height:58mm;margin:0 auto;object-fit:contain}
-  .print-route .print-route-label{font-size:9px;font-weight:600;margin:0 0 2px;text-align:left}
-  .print-sign{height:26px}
-  .print-work-content{height:34px}
-  .print-remarks{height:28px}
-  .print-checklist th,.print-checklist td{font-size:8.3px;padding:2.2px 4px;line-height:1.18}
-  .print-specs th,.print-specs td{font-size:9px;padding:3px 4px}
+  .print-title{text-align:center;font-size:24px;font-weight:800;margin-bottom:9px;letter-spacing:-0.025em}
+  .print-meta,.print-table,.print-route-layout{width:100%;border-collapse:collapse;table-layout:fixed}
+  .print-meta th,.print-meta td,.print-table th,.print-table td,.print-route-layout th,.print-route-layout td{
+    border:1px solid #4b4b4b;padding:5px 6px;font-size:11.5px;vertical-align:middle;line-height:1.28
+  }
+  .print-meta th,.print-table th,.print-route-layout th{background:#eeeeee;font-weight:600}
+  .print-section-title{font-weight:700;font-size:14px;margin:9px 0 4px}
+  .print-sign{height:30px}
+  .print-work-content{height:42px}
+  .print-remarks{height:36px}
+  .print-specs th,.print-specs td{font-size:10.8px;padding:4px 5px}
+  .print-checklist th,.print-checklist td{font-size:9.8px;padding:3.2px 4px;line-height:1.22}
+  .print-route-layout .route-text-cell{padding:0;vertical-align:stretch}
+  .print-route-text-table{width:100%;height:100%;border-collapse:collapse;table-layout:fixed}
+  .print-route-text-table th,.print-route-text-table td{border:0;border-bottom:1px solid #777;padding:7px 7px;font-size:10.5px;line-height:1.3;vertical-align:middle}
+  .print-route-text-table tr:last-child th,.print-route-text-table tr:last-child td{border-bottom:0}
+  .print-route-text-table th{width:28%;background:#f3f3f3;font-weight:600}
+  .print-route-image-cell{padding:4px!important;text-align:center;background:#fff}
+  .print-route-image-cell img{display:block;width:100%;height:100%;max-height:58mm;object-fit:contain;margin:0 auto}
   @media print{
-    @page{size:A4 portrait;margin:5mm}
+    @page{size:A4 portrait;margin:6mm}
     html,body{width:210mm;height:297mm}
     body{background:white;margin:0}
     body > header, main{display:none!important}
     #printSheet{display:block!important;margin:0;padding:0}
-    .print-doc{width:100%;max-height:287mm;overflow:hidden}
-    .print-title{font-size:17px;margin-bottom:4px}
-    .print-meta th,.print-meta td,.print-table th,.print-table td{padding:2.6px 4px;font-size:8.6px;line-height:1.15}
-    .print-section-title{font-size:10.5px;margin:4px 0 2px}
-    .print-specs th,.print-specs td{font-size:8.2px;padding:2.2px 3px}
-    .print-checklist th,.print-checklist td{font-size:7.5px;padding:1.6px 3px;line-height:1.1}
-    .print-route{padding:2px;margin-top:2px;break-inside:avoid;page-break-inside:avoid}
-    .print-route img{max-height:50mm;break-inside:avoid;page-break-inside:avoid}
-    .print-route .print-route-label{font-size:7.8px;margin-bottom:1px}
-    .print-sign{height:21px}
-    .print-work-content{height:27px}
-    .print-remarks{height:22px}
+    .print-doc{width:100%;max-height:285mm;overflow:hidden}
+    .print-title{font-size:20px;margin-bottom:6px}
+    .print-meta th,.print-meta td,.print-table th,.print-table td,.print-route-layout th,.print-route-layout td{
+      padding:4px 5px;font-size:10.4px;line-height:1.22
+    }
+    .print-section-title{font-size:12.5px;margin:6px 0 3px}
+    .print-specs th,.print-specs td{font-size:9.8px;padding:3.4px 4px}
+    .print-checklist th,.print-checklist td{font-size:8.9px;padding:2.5px 3.5px;line-height:1.17}
+    .print-route-text-table th,.print-route-text-table td{font-size:9.5px;padding:5px 5px;line-height:1.22}
+    .print-route-image-cell{padding:3px!important}
+    .print-route-image-cell img{max-height:46mm}
+    .print-sign{height:25px}
+    .print-work-content{height:34px}
+    .print-remarks{height:27px}
     .print-section{break-inside:avoid;page-break-inside:avoid}
+    .print-route-layout{break-inside:avoid;page-break-inside:avoid}
   }
 </style>
 </head>
@@ -482,7 +491,7 @@ function routeImageHtml(key, place="", forPrint=false){
   const entries=getRouteImageEntries(key,place);
   if(!entries.length) return "";
   if(forPrint){
-    return entries.map(x=>`<div style="margin-bottom:${entries.length>1?'7px':'0'}"><div class="print-route-label">${escapeHtml(x.label)}</div><img src="${x.src}" alt="${escapeHtml(x.label)}"></div>`).join("");
+    return entries.map(x=>`<img src="${x.src}" alt="">`).join("");
   }
   if(entries.length===1){
     const x=entries[0];
@@ -723,11 +732,27 @@ function buildPrintSheet(data){
 
       <div class="print-section">
         <div class="print-section-title">2. 운행경로 및 작업 동선도</div>
-        <table class="print-table">
-          <tr><th style="width:130px">운행경로</th><td>${escapeHtml(equipmentRouteText(e,data.place||""))}</td></tr>
-          <tr><th>기본 작업범위</th><td>${escapeHtml(equipmentWorkText(e,data.place||""))}</td></tr>
+        <table class="print-route-layout">
+          <colgroup>
+            <col style="width:58%">
+            <col style="width:42%">
+          </colgroup>
+          <tr>
+            <td class="route-text-cell">
+              <table class="print-route-text-table">
+                <tr>
+                  <th>운행경로</th>
+                  <td>${escapeHtml(equipmentRouteText(e,data.place||""))}</td>
+                </tr>
+                <tr>
+                  <th>작업범위</th>
+                  <td>${escapeHtml(equipmentWorkText(e,data.place||""))}</td>
+                </tr>
+              </table>
+            </td>
+            <td class="print-route-image-cell">${routeHtml}</td>
+          </tr>
         </table>
-        <div class="print-route">${routeHtml}</div>
       </div>
 
       <div class="print-section">
