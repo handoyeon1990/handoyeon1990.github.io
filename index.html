@@ -62,103 +62,97 @@
   .route-image-label{font-size:12px;font-weight:800;color:#475467;margin:0 0 6px}
   .route-source-note{font-size:11px;color:var(--muted);margin-top:6px}
   #printSheet{display:none}
+  /* 흑백 A4 작업계획서 출력 서식 */
   .print-doc{
     font-family:"Pretendard","Noto Sans KR","Apple SD Gothic Neo",sans-serif;
-    color:#111;font-weight:400;letter-spacing:-0.012em;
-    width:100%;min-height:282mm;display:flex;flex-direction:column
+    color:#000;background:#fff;width:100%;box-sizing:border-box;
+    font-weight:400;letter-spacing:-0.01em
   }
   .print-title{
-    text-align:center;font-size:25px;font-weight:800;
-    margin:0 0 7px;letter-spacing:-0.025em;line-height:1.15
+    text-align:center;font-size:26px;font-weight:800;line-height:1.15;
+    margin:0 0 7px;padding:2px 0
   }
   .print-meta,.print-table,.print-route-layout{
     width:100%;border-collapse:collapse;table-layout:fixed
   }
+  .print-meta,.print-table,.print-route-layout{border:1.6px solid #000}
   .print-meta th,.print-meta td,.print-table th,.print-table td,
   .print-route-layout th,.print-route-layout td{
-    border:1.2px solid #333;padding:6px 7px;font-size:12.2px;
-    vertical-align:middle;line-height:1.28;word-break:keep-all
+    border:1px solid #000;padding:5px 6px;vertical-align:middle;
+    font-size:11.5px;line-height:1.24;word-break:keep-all
   }
   .print-meta th,.print-table th,.print-route-layout th{
-    background:#e9e9e9;font-weight:700;text-align:center
+    background:#eeeeee;color:#000;font-weight:700;text-align:center
   }
-  .print-meta th{width:17%}
   .print-meta td{font-weight:500}
   .print-section{margin-top:7px}
   .print-section-title{
-    font-weight:800;font-size:14.5px;margin:0 0 4px;
-    padding:3px 5px;border-left:4px solid #333
+    border:1.6px solid #000;border-bottom:0;background:#e6e6e6;
+    font-size:13px;font-weight:800;padding:4px 7px;line-height:1.15
   }
-  .print-work-content{height:38px}
+  .print-specs th,.print-specs td{font-size:10.9px;padding:4px 5px}
+  .print-work-content{height:34px}
   .print-sign{height:27px}
-  .print-specs th,.print-specs td{
-    font-size:11.6px;padding:5px 6px;line-height:1.22
+  .print-checklist th,.print-checklist td{
+    font-size:9.6px;padding:3.2px 4px;line-height:1.18
   }
-  .print-route-layout{height:54mm}
+  .print-checklist .group{
+    width:12%;text-align:center;font-weight:700;background:#f3f3f3
+  }
+  .print-checklist .num{width:5%;text-align:center;font-weight:700}
+  .print-checklist .item{width:69%;font-weight:500}
+  .print-checklist .yn{width:7%;text-align:center;font-size:13px}
+  .print-route-layout{height:41mm}
   .print-route-layout .route-text-cell{padding:0!important;vertical-align:stretch}
   .print-route-text-table{
     width:100%;height:100%;border-collapse:collapse;table-layout:fixed
   }
   .print-route-text-table th,.print-route-text-table td{
-    border:0;border-bottom:1px solid #666;padding:8px 8px;
-    font-size:11.7px;line-height:1.32;vertical-align:middle;word-break:keep-all
+    border:0;border-bottom:1px solid #000;padding:6px 7px;
+    font-size:10.4px;line-height:1.23;vertical-align:middle
   }
   .print-route-text-table tr:last-child th,
   .print-route-text-table tr:last-child td{border-bottom:0}
   .print-route-text-table th{
-    width:27%;background:#efefef;font-weight:700;text-align:center
+    width:25%;background:#f1f1f1;font-weight:700;text-align:center
   }
-  .print-route-image-cell{
-    padding:4px!important;text-align:center;background:#fff;
-    vertical-align:middle!important
-  }
+  .print-route-image-cell{padding:3px!important;text-align:center;background:#fff}
   .print-route-image-cell img{
-    display:block;width:100%;height:100%;max-height:51mm;
+    display:block;width:100%;height:100%;max-height:39mm;
     object-fit:contain;margin:0 auto
   }
-  .print-checklist th,.print-checklist td{
-    font-size:10.8px;padding:5px 5px;line-height:1.25
-  }
-  .print-checklist .check-no{
-    width:7%;text-align:center;font-weight:700;background:#f4f4f4
-  }
-  .print-checklist .check-item{width:43%;font-weight:500}
-  .print-checklist tbody tr{height:9.3mm}
-  .print-remarks{height:25px;font-size:11.5px!important}
+  .print-remarks{height:24px;font-size:10.5px!important}
+  .print-footer-note{font-size:8.5px;text-align:right;margin-top:3px;color:#333}
   @media print{
     @page{size:A4 portrait;margin:6mm}
-    html,body{width:210mm;height:297mm}
-    body{background:#fff;margin:0}
+    html,body{width:210mm;height:297mm;background:#fff;margin:0}
     body > header,main{display:none!important}
     #printSheet{display:block!important;margin:0;padding:0}
-    .print-doc{width:100%;height:285mm;min-height:285mm;overflow:hidden}
-    .print-title{font-size:19pt;margin-bottom:2.5mm}
+    .print-doc{width:198mm;max-height:285mm;margin:0 auto;overflow:hidden}
+    .print-title{font-size:19pt;margin-bottom:2.2mm}
     .print-meta th,.print-meta td,.print-table th,.print-table td,
     .print-route-layout th,.print-route-layout td{
-      font-size:10.5pt;padding:1.6mm 1.8mm;line-height:1.2
+      font-size:9.6pt;padding:1.25mm 1.5mm;line-height:1.17
     }
-    .print-section{margin-top:2.3mm}
-    .print-section-title{
-      font-size:11.8pt;margin-bottom:1.2mm;padding:0.7mm 1.3mm
-    }
-    .print-work-content{height:10mm}
-    .print-sign{height:7mm}
-    .print-specs th,.print-specs td{
-      font-size:9.8pt;padding:1.2mm 1.5mm
-    }
-    .print-route-layout{height:51mm}
-    .print-route-text-table th,.print-route-text-table td{
-      font-size:9.7pt;padding:2mm 1.8mm;line-height:1.22
-    }
-    .print-route-image-cell img{max-height:48mm}
+    .print-section{margin-top:1.8mm}
+    .print-section-title{font-size:10.8pt;padding:1mm 1.6mm}
+    .print-specs th,.print-specs td{font-size:9.1pt;padding:1mm 1.25mm}
+    .print-work-content{height:8mm}
+    .print-sign{height:6.5mm}
     .print-checklist th,.print-checklist td{
-      font-size:9.3pt;padding:1.2mm 1.3mm;line-height:1.18
+      font-size:8.6pt;padding:.72mm 1mm;line-height:1.12
     }
-    .print-checklist tbody tr{height:8.7mm}
-    .print-remarks{height:7mm;font-size:9.5pt!important}
+    .print-checklist .yn{font-size:10pt}
+    .print-route-layout{height:37mm}
+    .print-route-text-table th,.print-route-text-table td{
+      font-size:8.9pt;padding:1.2mm 1.4mm;line-height:1.15
+    }
+    .print-route-image-cell img{max-height:35mm}
+    .print-remarks{height:6mm;font-size:8.9pt!important}
     .print-section,.print-route-layout,.print-checklist{
       break-inside:avoid;page-break-inside:avoid
     }
+    *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
   }
 </style>
 </head>
@@ -802,11 +796,42 @@ function workTimePrintText(data){
   return data.duration || [data.start,data.end].filter(Boolean).join("~") || "-";
 }
 
+function checklistGroupLabel(key,index){
+  const n=index+1;
+  if(key==="water_new"){
+    if(n===1) return "운전자 자격";
+    if(n>=2 && n<=5) return "운전 시작 전 조치";
+    if(n>=6 && n<=12) return "운행 및 살수 작업 시";
+    if(n===13) return "작업 종료 시";
+    return "수리 및 점검 시";
+  }
+  if(key==="sweeper"){
+    if(n===1) return "운전자 자격";
+    if(n>=2 && n<=4) return "운전 시작 전 조치";
+    if(n>=5 && n<=9) return "운행 및 청소 작업 시";
+    if(n===10) return "작업 종료 시";
+    return "수리 및 점검 시";
+  }
+  if(key==="loader_new" || key==="loader_old"){
+    if(n===1) return "운전자 자격";
+    if(n>=2 && n<=3) return "운전 시작 전 조치";
+    if(n>=4 && n<=8) return "작업 중 조치";
+    if(n===9) return "운전자 이탈 시";
+    return "수리 등 점검 시";
+  }
+  if(key==="truck_5t" || key==="porter" || key==="bongo"){
+    if(n===1) return "운전자 자격";
+    if(n>=2 && n<=3) return "운전 시작 전 조치";
+    if(n>=4 && n<=8) return "운행 및 작업 중";
+    return "작업 종료 시";
+  }
+  return "";
+}
+
 function buildPrintSheet(data){
   const key=data.equipmentKey;
   const e=EQUIPMENT[key];
   if(!e) throw new Error("장비 정보를 찾을 수 없습니다.");
-
   const timeText=workTimePrintText(data);
 
   const specEntries=Object.entries(e.specs);
@@ -820,23 +845,15 @@ function buildPrintSheet(data){
     </tr>`);
   }
 
-  const checks=e.checklist.map((item,i)=>({
-    no:(e.checkNumbers&&e.checkNumbers[i]) || String(i+1),
-    item
-  }));
-  const half=Math.ceil(checks.length/2);
-  const checkRows=[];
-  for(let i=0;i<half;i++){
-    const left=checks[i];
-    const right=checks[i+half];
-    checkRows.push(`<tr>
-      <td class="check-no">${escapeHtml(left.no)}</td>
-      <td class="check-item">${escapeHtml(left.item)}</td>
-      ${right
-        ? `<td class="check-no">${escapeHtml(right.no)}</td><td class="check-item">${escapeHtml(right.item)}</td>`
-        : `<td class="check-no"></td><td class="check-item"></td>`}
-    </tr>`);
-  }
+  const checklistHtml=e.checklist.map((item,i)=>`
+    <tr>
+      <td class="group">${escapeHtml(checklistGroupLabel(key,i))}</td>
+      <td class="num">${escapeHtml((e.checkNumbers&&e.checkNumbers[i]) || String(i+1))}</td>
+      <td class="item">${escapeHtml(item)}</td>
+      <td class="yn">□</td>
+      <td class="yn">□</td>
+    </tr>`
+  ).join("");
 
   const routeHtml=routeImageHtml(key,data.place||"",true);
 
@@ -846,8 +863,10 @@ function buildPrintSheet(data){
 
       <table class="print-meta">
         <tr>
-          <th>장비명 / 차량번호</th>
-          <td colspan="3">${escapeHtml(e.name)} / ${escapeHtml(e.vehicleNo||"-")}</td>
+          <th style="width:14%">작성자</th>
+          <td style="width:36%">${escapeHtml(data.worker||data.writer||"")}</td>
+          <th style="width:14%">관리감독자</th>
+          <td style="width:36%">${escapeHtml(data.supervisor||"한도연")}</td>
         </tr>
         <tr>
           <th>운전자 및 작업자</th>
@@ -865,32 +884,48 @@ function buildPrintSheet(data){
           <th>작업내용</th>
           <td colspan="3" class="print-work-content">${escapeHtml(data.content||"-").replace(/\n/g,"<br>")}</td>
         </tr>
-        <tr class="print-sign">
-          <th>작성자</th>
-          <td>${escapeHtml(data.worker||data.writer||"")}</td>
-          <th>관리감독자</th>
-          <td>${escapeHtml(data.supervisor||"")}</td>
-        </tr>
       </table>
 
       <div class="print-section">
         <div class="print-section-title">1. 기계·장비 제원</div>
-        <table class="print-table print-specs"><tbody>${specRows.join("")}</tbody></table>
+        <table class="print-table print-specs">
+          <tr>
+            <th style="width:18%">장비명 / 차량번호</th>
+            <td colspan="3">${escapeHtml(e.name)} / ${escapeHtml(e.vehicleNo||"-")}</td>
+          </tr>
+          ${specRows.join("")}
+        </table>
       </div>
 
       <div class="print-section">
-        <div class="print-section-title">2. 운행경로 · 작업범위 · 작업동선</div>
+        <div class="print-section-title">2. 운전자 작업 체크리스트</div>
+        <table class="print-table print-checklist">
+          <thead>
+            <tr>
+              <th style="width:12%">구분</th>
+              <th style="width:5%">번호</th>
+              <th style="width:69%">점검 항목</th>
+              <th style="width:7%">적정</th>
+              <th style="width:7%">부적정</th>
+            </tr>
+          </thead>
+          <tbody>${checklistHtml}</tbody>
+        </table>
+      </div>
+
+      <div class="print-section">
+        <div class="print-section-title">3. 운행경로 및 작업내용</div>
         <table class="print-route-layout">
-          <colgroup><col style="width:57%"><col style="width:43%"></colgroup>
+          <colgroup><col style="width:58%"><col style="width:42%"></colgroup>
           <tr>
             <td class="route-text-cell">
               <table class="print-route-text-table">
                 <tr>
-                  <th>운행경로</th>
+                  <th>진입 / 운행경로</th>
                   <td>${escapeHtml(equipmentRouteText(e,data.place||""))}</td>
                 </tr>
                 <tr>
-                  <th>작업범위</th>
+                  <th>작업내용</th>
                   <td>${escapeHtml(equipmentWorkText(e,data.place||""))}</td>
                 </tr>
               </table>
@@ -901,19 +936,6 @@ function buildPrintSheet(data){
       </div>
 
       <div class="print-section">
-        <div class="print-section-title">3. 운전자 점검항목</div>
-        <table class="print-table print-checklist">
-          <thead>
-            <tr>
-              <th style="width:7%">번호</th><th style="width:43%">점검항목</th>
-              <th style="width:7%">번호</th><th style="width:43%">점검항목</th>
-            </tr>
-          </thead>
-          <tbody>${checkRows.join("")}</tbody>
-        </table>
-      </div>
-
-      <div class="print-section" style="margin-top:auto;padding-top:2mm">
         <div class="print-section-title">특이사항</div>
         <table class="print-table">
           <tr><td class="print-remarks" style="vertical-align:top">${escapeHtml(data.remarks||"-").replace(/\n/g,"<br>")}</td></tr>
