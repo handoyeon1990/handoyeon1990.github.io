@@ -476,7 +476,7 @@
 <section id="page-query" class="app-page standalone-page">
   <div class="card">
     <h2>작업 및 정비 내역 조회</h2>
-    <div class="small">단일 날짜 또는 기간을 선택하고 조회한 뒤, 개별·일괄 출력이나 기록대장 출력을 이용하세요.</div>
+    <div class="small">단일 날짜 또는 기간과 장비를 선택해 조회하세요. 조회된 결과를 개별·일괄 출력하거나 기록대장으로 출력할 수 있습니다.</div>
     <div class="query-controls">
       <div class="field">
         <label for="queryMode">조회 방식</label>
@@ -489,6 +489,10 @@
       <div class="field" id="queryEndField" hidden>
         <label for="queryEndDate">종료일</label>
         <input type="date" id="queryEndDate" />
+      </div>
+      <div class="field">
+        <label for="queryEquipment">조회 장비</label>
+        <select id="queryEquipment"><option value="">전체 장비</option></select>
       </div>
       <button class="primary" id="workLookupBtn" type="button">작업조회</button>
       <button class="secondary" id="maintenanceLookupBtn" type="button">정비내역조회</button>
@@ -1353,12 +1357,22 @@ function renderHistory(){
 
 
 let lastWorkRange=null, lastMaintenanceRange=null;
+$("queryEquipment").innerHTML='<option value="">전체 장비</option>'+MAINTENANCE_EQUIPMENT_ORDER.map(key=>{
+  const e=EQUIPMENT[key];
+  return `<option value="${escapeHtml(key)}">${escapeHtml(e.name)} (${escapeHtml(e.vehicleNo||"-")})</option>`;
+}).join("");
+function matchesLookupEquipment(record,key){
+  if(!key)return true;
+  if(record.equipment_key)return record.equipment_key===key;
+  const e=EQUIPMENT[key];
+  return !!e&&record.equipment===e.name&&(!record.vehicle_no||record.vehicle_no===e.vehicleNo);
+}
 function getQueryRange(){
   const start=$("queryDate").value;
   const end=$("queryMode").value==="range"?$("queryEndDate").value:start;
   if(!start||!end){alert("조회 날짜를 모두 선택해주세요.");return null;}
   if(start>end){alert("종료일은 시작일 이후로 선택해주세요.");return null;}
-  return {start,end,label:start===end?start:start+" ~ "+end};
+  return {start,end,label:start===end?start:start+" ~ "+end,equipmentKey:$("queryEquipment").value};
 }
 function syncQueryMode(){
   const range=$("queryMode").value==="range";
@@ -1411,7 +1425,7 @@ async function renderWorkLookup(){
   const btn=$("workLookupBtn");btn.disabled=true;
   lastWorkLookup=[];lastWorkRange=null;
   try{
-    lastWorkLookup=(await fetchDateRange(API_URL,range)).map(mapLookupWorkRecord);
+    lastWorkLookup=(await fetchDateRange(API_URL,range)).filter(r=>matchesLookupEquipment(r,range.equipmentKey)).map(mapLookupWorkRecord);
     lastWorkRange=range;
   }catch(err){console.error(err);alert("작업기록을 불러오지 못했습니다. 다시 조회해주세요.");return;}
   finally{btn.disabled=false;}
@@ -1419,7 +1433,7 @@ async function renderWorkLookup(){
   $("workQuerySection").style.display="block";
   const body=$("workLookupBody");
   if(!lastWorkLookup.length){
-    body.innerHTML='<tr><td colspan="8" class="query-empty">선택한 날짜 또는 기간의 작업기록이 없습니다.</td></tr>';
+    body.innerHTML='<tr><td colspan="8" class="query-empty">선택한 날짜·기간 및 장비에 해당하는 작업기록이 없습니다.</td></tr>';
     return;
   }
   body.innerHTML=lastWorkLookup.map(r=>`<tr>
@@ -1443,7 +1457,7 @@ async function renderMaintenanceLookup(){
   box.innerHTML='<div class="query-empty">정비기록을 불러오는 중...</div>';
   const btn=$("maintenanceLookupBtn");btn.disabled=true;
   try{
-    lastMaintenanceRecords=await fetchDateRange(MAINTENANCE_API_URL,range);
+    lastMaintenanceRecords=(await fetchDateRange(MAINTENANCE_API_URL,range)).filter(r=>matchesLookupEquipment(r,range.equipmentKey));
     lastMaintenanceRange=range;
     lastMaintenanceLookup={
       headers:["정비일자","장비","정비내역","정비내용","운전자","정비처","금액","특이사항"],
@@ -1451,7 +1465,7 @@ async function renderMaintenanceLookup(){
         r.worker||"",r.repair_shop||"",formatAmountKrW(r.amount_krw),r.remarks||""])
     };
     if(!lastMaintenanceRecords.length){
-      box.innerHTML='<div class="query-empty">선택한 날짜 또는 기간에 저장한 정비기록이 없습니다.</div>';
+      box.innerHTML='<div class="query-empty">선택한 날짜·기간 및 장비에 해당하는 정비기록이 없습니다.</div>';
       return;
     }
     box.innerHTML=`<table class="query-table">
