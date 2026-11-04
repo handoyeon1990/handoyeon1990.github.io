@@ -601,9 +601,17 @@ ROUTE_IMAGES.sweeper = {
   "외항":{...ROUTE_IMAGES.water["외항"], label:"노면청소차 외항 작업 동선"}
 };
 
+function routeZone(place=""){
+  if(["2부두","3부두","4부두","5부두","6부두","내항","내항집하장"].includes(place)) return "내항";
+  if(["9부두","10부두","11부두","외항","외항집하장"].includes(place)) return "외항";
+  return "";
+}
+
 function getRouteImageEntries(key, place=""){
   const cfg=ROUTE_IMAGES[key];
   if(!cfg) return [];
+  const zone=routeZone(place);
+  if(zone && cfg[zone]) return [cfg[zone]];
   if(place && cfg[place]) return [cfg[place]];
   const preferred=["내항","외항","집하장"].map(k=>cfg[k]).filter(Boolean);
   const unique=[];
