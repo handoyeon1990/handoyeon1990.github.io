@@ -117,13 +117,10 @@
     padding:0!important;text-align:center;background:#fff;
     overflow:hidden;position:relative;vertical-align:middle!important
   }
-  /* Draw the frame above the images, inside the printable area. */
-  .print-route-layout{position:relative}
-  .print-route-layout::after,.print-route-image-cell::after{
-    content:"";position:absolute;inset:0;z-index:2;
-    border:1px solid #000;pointer-events:none;box-sizing:border-box
-  }
-  .print-route-layout::after{border-width:1.6px}
+  /* Use one border per edge, including the divider beside the image. */
+  .print-route-layout{border-collapse:separate;border-spacing:0;border:1px solid #000}
+  .print-route-layout > tbody > tr > td{border:0}
+  .print-route-layout .route-text-cell{border-right:1px solid #000}
   .print-route-images{
     position:absolute;inset:.5mm;display:grid;grid-template-columns:minmax(0,1fr);
     grid-auto-rows:minmax(0,1fr);overflow:hidden
@@ -236,6 +233,10 @@
     box-sizing:border-box;width:100%;font-weight:400
   }
   .ledger-title{text-align:center;font-size:22px;font-weight:800;margin:0 0 11px}
+  .ledger-total{width:70mm;margin:0 0 2mm auto;border-collapse:collapse;table-layout:fixed}
+  .ledger-total th,.ledger-total td{border:1px solid #000;padding:1.2mm 2mm;font-size:10pt;line-height:1.2}
+  .ledger-total th{width:20mm;text-align:center;font-weight:700}
+  .ledger-total td{text-align:right;font-variant-numeric:tabular-nums}
   .ledger-meta{display:flex;justify-content:space-between;font-size:12px;margin-bottom:10px}
   .ledger-table{border-collapse:collapse;table-layout:fixed;width:100%;border:1.5px solid #000}
   .ledger-table th,.ledger-table td{
@@ -263,6 +264,9 @@
     }
     #printSheet .maintenance-ledger .ledger-table th,
     #printSheet .maintenance-ledger .ledger-table td{font-size:8.1pt}
+    #printSheet .maintenance-ledger .ledger-data-row,
+    #printSheet .maintenance-ledger .ledger-table tbody td{height:11.3mm}
+    #printSheet .maintenance-ledger .ledger-table .ledger-clip{max-height:9.3mm}
     #printSheet .ledger-table thead th{height:8.5mm;font-weight:700}
     #printSheet .ledger-table .ledger-clip{max-height:10mm;overflow:hidden;line-height:1.12}
     #printSheet .ledger-data-row{height:12mm;break-inside:avoid;page-break-inside:avoid}
@@ -1499,7 +1503,7 @@ function ledgerPages(rows,size=20){
   return pages;
 }
 
-function renderLedgerPage(kind,date,allRows,rows,pageIndex,pageCount){
+function renderLedgerPage(kind,date,allRows,rows,pageIndex,pageCount,totalAmount=0){
   const isWork=kind==="work";
   const title=isWork?"작업계획서 기록대장":"차량·장비 정비내역 기록대장";
   const headers=isWork
@@ -1514,6 +1518,7 @@ function renderLedgerPage(kind,date,allRows,rows,pageIndex,pageCount){
     </tr>`).join("");
   return `<div class="print-doc ledger-page ${isWork?"work-ledger":"maintenance-ledger"}">
     <div class="ledger-title">${escapeHtml(title)}</div>
+${isWork?"":`<table class="ledger-total" aria-label="조회된 정비내역 총금액"><tr><th>합</th><td>${escapeHtml(formatAmountKrW(totalAmount))}</td></tr></table>`}
     <div class="ledger-meta">
       <span>조회 날짜/기간: ${escapeHtml(date)}</span>
       <span>총 ${allRows.length}건 | ${pageIndex+1} / ${pageCount}페이지</span>
@@ -1551,8 +1556,9 @@ function printLedgerTable(kind){
         formatAmountKrW(r.amount_krw),
         r.remarks||""
       ]);
+  const totalAmount=isWork?0:source.reduce((sum,r)=>{const value=Number(r.amount_krw);return sum+(Number.isFinite(value)?value:0);},0);
   const chunks=ledgerPages(rows,20);
-  $("printSheet").innerHTML=chunks.map((chunk,i)=>renderLedgerPage(kind,date,rows,chunk,i,chunks.length)).join("");
+  $("printSheet").innerHTML=chunks.map((chunk,i)=>renderLedgerPage(kind,date,rows,chunk,i,chunks.length,totalAmount)).join("");
   setTimeout(()=>window.print(),120);
 }
 
