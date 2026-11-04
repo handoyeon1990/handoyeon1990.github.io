@@ -424,6 +424,33 @@
  .sub::before{background:#dbe7f1}
  @media(max-width:760px){body>header::before{inset:0;background-position:57% center}body>header::after{background:rgba(3,22,48,.4)}}
 }
+
+/* Slightly larger screen text for comfortable reading. */
+@media screen {
+ body{font-size:15px}
+ .side-nav button{font-size:14px}
+ label{font-size:14px}
+ input,select,textarea{font-size:15px}
+ button{font-size:14px}
+ .small,.sub{font-size:13px}
+ .spec .k{font-size:13px}
+ .spec .v,.refbox{font-size:15px}
+ th,td{font-size:14px}
+ .badge{font-size:12px}
+ .route-image-label{font-size:14px}
+ .route-source-note{font-size:12px}
+ .record-actions button{font-size:14px}
+ .card h2{font-size:23px}
+ .card h3{font-size:19px}
+ @media(max-width:760px){
+  .side-nav{gap:10px}.side-nav button{font-size:13px}
+  h1{font-size:27px}
+  .sub{font-size:13px}
+  .card h2{font-size:21px}
+  .fields{grid-template-columns:1fr}.wide{grid-column:1/-1}
+  .query-controls .field{flex-basis:155px}
+ }
+}
 </style>
 </head>
 <body>
