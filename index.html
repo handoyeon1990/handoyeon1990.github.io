@@ -191,10 +191,7 @@
         <div class="field">
           <label for="place">작업장소</label>
           <select id="place">
-            <option value="">선택하세요</option>
-            <option value="내항">내항</option>
-            <option value="외항">외항</option>
-            <option value="집하장">집하장</option>
+            <option value="">장비를 선택하면 작업장소가 표시됩니다.</option>
           </select>
         </div>
         <div class="field">
@@ -229,7 +226,9 @@
         </div>
         <div class="field wide">
           <label for="workContent">작업내용</label>
-          <textarea id="workContent" placeholder="오늘 실제 작업내용을 직접 입력하세요."></textarea>
+          <select id="workContent">
+            <option value="">장비를 선택하면 작업내용이 표시됩니다.</option>
+          </select>
         </div>
         <div class="field wide">
           <label for="remarks">특이사항</label>
@@ -412,7 +411,7 @@ const EQUIPMENT = {
   },
 
   water_new: {
-    name:"신형살수차", category:"살수차", vehicleNo:"미입력",
+    name:"신형살수차", category:"살수차", vehicleNo:"83우7528",
     specs:{
       "제조사":"신정개발특장차(주)",
       "모델명":"WTA060DM",
@@ -450,7 +449,7 @@ const EQUIPMENT = {
     ]
   },
   sweeper: {
-    name:"노면청소차", category:"노면청소차", vehicleNo:"미입력",
+    name:"노면청소차", category:"노면청소차", vehicleNo:"842노 1140",
     specs:{
       "제조사":"신정개발특장차(주)",
       "모델명":"RS04J",
@@ -653,6 +652,34 @@ function fillTimeOptions(){
     }
   });
 }
+const PLACE_OPTIONS = {
+  truck_5t:["내항집하장","외항집하장","제주이엔씨","환경자원순환센터"],
+  loader_new:["3부두","5부두","9부두","10부두","내항집하장","외항집하장"],
+  loader_old:["3부두","5부두","9부두","10부두","내항집하장","외항집하장"],
+  water_new:["2부두","3부두","4부두","5부두","6부두","9부두","10부두","11부두"],
+  sweeper:["2부두","3부두","4부두","5부두","6부두","9부두","10부두","11부두"],
+  porter:["내항","외항","내항집하장","외항집하장"],
+  bongo:["내항","외항","내항집하장","외항집하장"]
+};
+
+const WORK_OPTIONS = {
+  truck_5t:["폐기물 상차","폐기물 운송"],
+  loader_new:["폐기물상차","솔작업","해양쓰레기 수거"],
+  loader_old:["폐기물상차","솔작업","해양쓰레기 수거"],
+  water_new:["노면 살수작업"],
+  sweeper:["노면 청소작업"],
+  porter:["폐기물 수거"],
+  bongo:["폐기물 수거"]
+};
+
+function setSelectOptions(id, options, selected="", keepLegacy=false){
+  const sel=$(id);
+  const list=[...(options||[])];
+  if(keepLegacy && selected && !list.includes(selected)) list.push(selected);
+  sel.innerHTML='<option value="">선택하세요</option>'+list.map(v=>`<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join("");
+  sel.value=selected && list.includes(selected) ? selected : "";
+}
+
 const equipment = $("equipment");
 const order = ["water_new","sweeper","truck_5t","porter","bongo","loader_new","loader_old"];
 order.forEach(k=>{
@@ -661,12 +688,21 @@ order.forEach(k=>{
 const today = new Date();
 $("workDate").value = new Date(today.getTime()-today.getTimezoneOffset()*60000).toISOString().slice(0,10);
 
-function renderEquipment(){
-  const key=equipment.value, e=EQUIPMENT[key], place=$("place").value;
+function renderEquipment(keepCurrent=false){
+  const key=equipment.value, e=EQUIPMENT[key];
+  if(!e) return;
+
+  const oldPlace=keepCurrent ? $("place").value : "";
+  const oldWork=keepCurrent ? $("workContent").value : "";
+
+  setSelectOptions("place", PLACE_OPTIONS[key]||[], oldPlace, keepCurrent);
+  setSelectOptions("workContent", WORK_OPTIONS[key]||[], oldWork, keepCurrent);
+
+  const place=$("place").value;
   $("category").value=e.category;
   $("vehicleNo").value=e.vehicleNo;
-  $("defaultWork").textContent=equipmentWorkText(e,place);
-  $("route").textContent=equipmentRouteText(e,place);
+  $("defaultWork").textContent=(WORK_OPTIONS[key]||[]).join(" / ") || equipmentWorkText(e,place);
+  $("route").textContent=place ? `${place} / ${equipmentRouteText(e,place)}` : equipmentRouteText(e,place);
   $("routeFlow").innerHTML=routeImageHtml(key,place,false);
   $("specs").innerHTML=Object.entries(e.specs).map(([k,v])=>`<div class="spec"><div class="k">${escapeHtml(k)}</div><div class="v">${escapeHtml(v)}</div></div>`).join("");
   $("checklist").innerHTML=e.checklist.map((item,i)=>`
@@ -675,6 +711,7 @@ function renderEquipment(){
       <td>${escapeHtml(item)}</td>
     </tr>`).join("");
 }
+
 function escapeHtml(s){return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));}
 function calcDuration(){
   const s=$("startTime").value, e=$("endTime").value;
@@ -687,11 +724,13 @@ function getChecks(){
   return [];
 }
 function clearInputs(keepDate=true){
-  ["place","startTime","endTime","worker","workContent","remarks","writer"].forEach(id=>$(id).value=""); $("supervisor").value="한도연";
+  ["startTime","endTime","worker","remarks","writer"].forEach(id=>$(id).value="");
+  $("supervisor").value="한도연";
   if(!keepDate) $("workDate").value="";
   $("duration").value="";
-  renderEquipment();
+  renderEquipment(false);
 }
+
 function records(){ return recordCache; }
 
 async function loadCloudRecords(){
@@ -726,7 +765,8 @@ async function loadCloudRecords(){
 
 $("saveBtn").addEventListener("click", async ()=>{
   if(!$("workDate").value){alert("날짜를 입력해주세요.");return;}
-  if(!$("workContent").value.trim()){alert("작업내용을 입력해주세요.");return;}
+  if(!$("place").value){alert("작업장소를 선택해주세요.");return;}
+  if(!$("workContent").value.trim()){alert("작업내용을 선택해주세요.");return;}
 
   const e=EQUIPMENT[equipment.value];
   const payload={
@@ -772,8 +812,14 @@ $("endTime").addEventListener("change",calcDuration);
 $("worker").addEventListener("change",()=>{
   $("writer").value=$("worker").value;
 });
-equipment.addEventListener("change",renderEquipment);
-$("place").addEventListener("change",renderEquipment);
+equipment.addEventListener("change",()=>renderEquipment(false));
+$("place").addEventListener("change",()=>{
+  const key=equipment.value, e=EQUIPMENT[key];
+  if(!e) return;
+  const place=$("place").value;
+  $("route").textContent=place ? `${place} / ${equipmentRouteText(e,place)}` : equipmentRouteText(e,place);
+  $("routeFlow").innerHTML=routeImageHtml(key,place,false);
+});
 
 
 function compactDurationText(start,end,fallback=""){
@@ -990,10 +1036,15 @@ window.deleteRecord=async id=>{
 };
 window.loadRecord=id=>{
   const r=records().find(x=>x.id===id); if(!r)return;
-  equipment.value=r.equipmentKey;
-  $("workDate").value=r.date||"";$("place").value=r.place||"";$("startTime").value=r.start||"";$("endTime").value=r.end||"";
-  $("worker").value=r.worker||"";$("workContent").value=r.content||"";$("remarks").value=r.remarks||"";$("writer").value=r.worker||"";$("supervisor").value=r.supervisor||"한도연";
-  renderEquipment();
+  const loadKey=r.equipmentKey==="water" ? "water_new" : r.equipmentKey;
+  if(EQUIPMENT[loadKey]) equipment.value=loadKey;
+  renderEquipment(false);
+  $("workDate").value=r.date||"";
+  setSelectOptions("place", PLACE_OPTIONS[equipment.value]||[], r.place||"", true);
+  setSelectOptions("workContent", WORK_OPTIONS[equipment.value]||[], r.content||"", true);
+  $("startTime").value=r.start||"";$("endTime").value=r.end||"";
+  $("worker").value=r.worker||"";$("remarks").value=r.remarks||"";$("writer").value=r.worker||"";$("supervisor").value=r.supervisor||"한도연";
+  renderEquipment(true);
   calcDuration();
   window.scrollTo({top:0,behavior:"smooth"});
 };
