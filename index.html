@@ -233,7 +233,9 @@
     box-sizing:border-box;width:100%;font-weight:400
   }
   .ledger-title{text-align:center;font-size:22px;font-weight:800;margin:0 0 11px}
-  .ledger-total{width:70mm;margin:0 0 2mm auto;border-collapse:collapse;table-layout:fixed}
+  .ledger-heading{display:grid;grid-template-columns:minmax(0,1fr) max-content minmax(0,1fr)}
+  .ledger-heading .ledger-title{grid-column:2;grid-row:1;white-space:nowrap}
+  .ledger-total{grid-column:3;grid-row:2;width:100%;margin:0 0 2mm;border-collapse:collapse;table-layout:fixed}
   .ledger-total th,.ledger-total td{border:1px solid #000;padding:1.2mm 2mm;font-size:10pt;line-height:1.2}
   .ledger-total th{width:20mm;text-align:center;font-weight:700}
   .ledger-total td{text-align:right;font-variant-numeric:tabular-nums}
@@ -1517,8 +1519,8 @@ function renderLedgerPage(kind,date,allRows,rows,pageIndex,pageCount,totalAmount
       ${row.map(v=>`<td><div class="ledger-clip">${escapeHtml(v??"")}</div></td>`).join("")}
     </tr>`).join("");
   return `<div class="print-doc ledger-page ${isWork?"work-ledger":"maintenance-ledger"}">
-    <div class="ledger-title">${escapeHtml(title)}</div>
-${isWork?"":`<table class="ledger-total" aria-label="조회된 정비내역 총금액"><tr><th>합</th><td>${escapeHtml(formatAmountKrW(totalAmount))}</td></tr></table>`}
+    <div class="ledger-heading"><div class="ledger-title">${escapeHtml(title)}</div>
+${isWork?"":`<table class="ledger-total" aria-label="조회된 정비내역 총금액"><tr><th>총금액</th><td>${escapeHtml(formatAmountKrW(totalAmount))}</td></tr></table>`}</div>
     <div class="ledger-meta">
       <span>조회 날짜/기간: ${escapeHtml(date)}</span>
       <span>총 ${allRows.length}건 | ${pageIndex+1} / ${pageCount}페이지</span>
