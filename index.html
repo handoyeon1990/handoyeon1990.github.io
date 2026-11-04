@@ -1076,7 +1076,11 @@ function buildPrintSheet(data){
   if(!e) throw new Error("장비 정보를 찾을 수 없습니다.");
   const timeText=workTimePrintText(data);
 
-  const specEntries=Object.entries(e.specs);
+  const specEntries=[
+    ["장비명 / 차량번호",e.name+" / "+(e.vehicleNo||"-")],
+    ["제조사",e.specs["제조사"]||"-"],
+    ...Object.entries(e.specs).filter(([label])=>label!=="제조사")
+  ];
   const specRows=[];
   for(let i=0;i<specEntries.length;i+=2){
     const a=specEntries[i], b=specEntries[i+1];
@@ -1129,10 +1133,6 @@ function buildPrintSheet(data){
       <div class="print-section">
         <div class="print-section-title">1. 기계·장비 제원</div>
         <table class="print-table print-specs">
-          <tr>
-            <th style="width:18%">장비명 / 차량번호</th>
-            <td colspan="3">${escapeHtml(e.name)} / ${escapeHtml(e.vehicleNo||"-")}</td>
-          </tr>
           ${specRows.join("")}
         </table>
       </div>
