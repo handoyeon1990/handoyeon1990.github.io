@@ -213,6 +213,44 @@
   .maintenance-form .fields{margin-top:12px}
   .maintenance-form .field select,.maintenance-form .field input,.maintenance-form .field textarea{width:100%}
   @media print{#page-maintenance{display:none!important}}
+
+  /* 첨부한 흑백 기록대장의 6열 단순 표 구성을 바탕으로 한 A4 기록대장 */
+  .ledger-page{
+    color:#000;background:#fff;font-family:"Noto Sans KR","Apple SD Gothic Neo",sans-serif;
+    box-sizing:border-box;width:100%;font-weight:400
+  }
+  .ledger-title{text-align:center;font-size:22px;font-weight:800;margin:0 0 11px}
+  .ledger-meta{display:flex;justify-content:space-between;font-size:12px;margin-bottom:10px}
+  .ledger-table{border-collapse:collapse;table-layout:fixed;width:100%;border:1.5px solid #000}
+  .ledger-table th,.ledger-table td{
+    border:1px solid #222;vertical-align:middle;text-align:center;
+    padding:4px 3px;font-size:10px;line-height:1.18;word-break:break-word
+  }
+  .ledger-table th{font-weight:700;background:#eee}
+  .ledger-data-row{height:12mm}
+  .ledger-table .ledger-clip{
+    max-height:9.6mm;overflow:hidden;line-height:1.18;word-break:break-word
+  }
+  @media print{
+    #printSheet .ledger-page{
+      width:200mm;height:273mm;min-height:273mm;max-height:273mm;
+      margin:0 auto;padding:0;overflow:hidden!important;box-sizing:border-box;
+      break-after:page;page-break-after:always;break-inside:avoid
+    }
+    #printSheet .ledger-page:last-child{break-after:auto;page-break-after:auto}
+    #printSheet .ledger-title{font-size:17pt;margin:0 0 3.5mm}
+    #printSheet .ledger-meta{font-size:9pt;margin-bottom:3mm}
+    #printSheet .ledger-table{border:1.2px solid #000;table-layout:fixed;width:100%}
+    #printSheet .ledger-table th,#printSheet .ledger-table td{
+      border:0.7px solid #333;padding:0.7mm 0.6mm;font-size:8.7pt;
+      line-height:1.12;height:12mm;overflow:hidden
+    }
+    #printSheet .maintenance-ledger .ledger-table th,
+    #printSheet .maintenance-ledger .ledger-table td{font-size:8.1pt}
+    #printSheet .ledger-table thead th{height:8.5mm;font-weight:700}
+    #printSheet .ledger-table .ledger-clip{max-height:10mm;overflow:hidden;line-height:1.12}
+    #printSheet .ledger-data-row{height:12mm;break-inside:avoid;page-break-inside:avoid}
+  }
 </style>
 </head>
 <body>
@@ -374,7 +412,7 @@
         <input id="mDate" type="date" />
       </div>
       <div class="field">
-        <label for="mWorker">운전자 및 작업자</label>
+        <label for="mWorker">운전자</label>
         <select id="mWorker"><option value="">선택하세요</option></select>
       </div>
       <div class="field wide">
@@ -394,6 +432,11 @@
           <option value="우성">우성</option>
           <option value="산지공업사">산지공업사</option>
         </select>
+      </div>
+      <div class="field">
+        <label for="mAmount">금액 (원)</label>
+        <input id="mAmount" type="text" inputmode="numeric" maxlength="15" placeholder="예: 150000 또는 150,000" />
+        <div class="small">금액은 숫자로 입력하세요. 정해지지 않았다면 비워두셔도 됩니다.</div>
       </div>
       <div class="field wide">
         <label for="mRemarks">특이사항</label>
@@ -429,12 +472,12 @@
   <section class="card query-result" id="workQuerySection" style="display:none">
     <div class="topline">
       <h3>작업조회 결과</h3>
-      <button class="ghost no-print" id="printWorkLookupBtn" type="button">조회 결과 출력</button>
+      <button class="ghost no-print" id="printWorkLookupBtn" type="button">기록대장 출력 (20건/장)</button>
     </div>
     <div class="query-table-wrap">
       <table class="query-table">
         <thead>
-          <tr><th>날짜</th><th>장비</th><th>작업장소</th><th>작업시간</th><th>작업자</th><th>작업내용</th><th>특이사항</th><th>출력</th></tr>
+          <tr><th>날짜</th><th>장비</th><th>작업장소</th><th>작업시간</th><th>작업자</th><th>작업내용</th><th>특이사항</th><th>개별출력</th></tr>
         </thead>
         <tbody id="workLookupBody"></tbody>
       </table>
@@ -444,7 +487,7 @@
   <section class="card query-result" id="maintenanceQuerySection" style="display:none">
     <div class="topline">
       <h3>정비내역조회 결과</h3>
-      <button class="ghost no-print" id="printMaintenanceLookupBtn" type="button">조회 결과 출력</button>
+      <button class="ghost no-print" id="printMaintenanceLookupBtn" type="button">기록대장 출력 (20건/장)</button>
     </div>
     <div id="maintenanceLookupResult" class="query-table-wrap"></div>
   </section>
@@ -1266,7 +1309,7 @@ function renderWorkLookup(){
     <td>${escapeHtml(r.worker||"")}</td>
     <td>${escapeHtml(r.content||"")}</td>
     <td>${escapeHtml(r.remarks||"")}</td>
-    <td><button class="ghost" type="button" onclick="printRecord(${Number(r.id)})">출력</button></td>
+    <td><button class="ghost" type="button" onclick="printRecord(${Number(r.id)})">개별출력</button></td>
   </tr>`).join("");
 }
 
@@ -1282,15 +1325,16 @@ async function renderMaintenanceLookup(){
     const url=`${MAINTENANCE_API_URL}?select=*&work_date=eq.${encodeURIComponent(date)}&order=created_at.desc`;
     lastMaintenanceRecords=(await apiRequest(url,{method:"GET",headers:{"Accept":"application/json"}}))||[];
     lastMaintenanceLookup={
-      headers:["날짜","장비","정비내역","정비내용","운전자 및 작업자","정비처","특이사항"],
-      rows:lastMaintenanceRecords.map(r=>[r.work_date,r.equipment,r.maintenance_item,r.maintenance_detail,r.worker||"",r.repair_shop||"",r.remarks||""])
+      headers:["정비일자","장비","정비내역","정비내용","운전자","정비처","금액","특이사항"],
+      rows:lastMaintenanceRecords.map(r=>[r.work_date,r.equipment,r.maintenance_item,r.maintenance_detail,
+        r.worker||"",r.repair_shop||"",formatAmountKrW(r.amount_krw),r.remarks||""])
     };
     if(!lastMaintenanceRecords.length){
       box.innerHTML='<div class="query-empty">해당 날짜에 사이트에서 저장한 정비기록이 없습니다.</div>';
       return;
     }
     box.innerHTML=`<table class="query-table">
-      <thead><tr><th>날짜</th><th>장비</th><th>정비내역</th><th>정비내용</th><th>작업자</th><th>정비처</th><th>특이사항</th><th>출력</th></tr></thead>
+      <thead><tr><th>날짜</th><th>장비</th><th>정비내역</th><th>정비내용</th><th>운전자</th><th>정비처</th><th>금액</th><th>특이사항</th><th>개별출력</th></tr></thead>
       <tbody>${lastMaintenanceRecords.map(r=>`<tr>
         <td>${escapeHtml(r.work_date)}</td>
         <td>${escapeHtml(r.equipment||"")}</td>
@@ -1298,14 +1342,21 @@ async function renderMaintenanceLookup(){
         <td>${escapeHtml(r.maintenance_detail||"")}</td>
         <td>${escapeHtml(r.worker||"")}</td>
         <td>${escapeHtml(r.repair_shop||"")}</td>
+        <td>${escapeHtml(formatAmountKrW(r.amount_krw))}</td>
         <td>${escapeHtml(r.remarks||"")}</td>
-        <td><button class="ghost" type="button" onclick="printMaintenanceRecord(${Number(r.id)})">출력</button></td>
+        <td><button class="ghost" type="button" onclick="printMaintenanceRecord(${Number(r.id)})">개별출력</button></td>
       </tr>`).join("")}</tbody>
     </table>`;
   }catch(err){
     console.error(err);lastMaintenanceRecords=[];lastMaintenanceLookup={headers:[],rows:[]};
     box.innerHTML='<div class="query-empty">정비기록 조회에 실패했습니다. 서버 연결 상태를 확인해주세요.</div>';
   }finally{btn.disabled=false;}
+}
+
+function formatAmountKrW(value){
+  if(value===null || value===undefined || value==="") return "-";
+  const n=Number(value);
+  return Number.isFinite(n)?n.toLocaleString("ko-KR")+"원":String(value);
 }
 
 window.printMaintenanceRecord=id=>{
@@ -1317,48 +1368,83 @@ window.printMaintenanceRecord=id=>{
       <tr><th style="width:20%">정비 날짜</th><td>${escapeHtml(r.work_date)}</td></tr>
       <tr><th>장비명 / 차량번호</th><td>${escapeHtml(r.equipment)} / ${escapeHtml(r.vehicle_no||"-")}</td></tr>
       <tr><th>정비내역</th><td>${escapeHtml(r.maintenance_item)}</td></tr>
-      <tr><th>정비내용</th><td style="min-height:20mm">${escapeHtml(r.maintenance_detail).replace(/\n/g,"<br>")}</td></tr>
-      <tr><th>운전자 및 작업자</th><td>${escapeHtml(r.worker||"-")}</td></tr>
+      <tr><th>정비내용</th><td>${escapeHtml(r.maintenance_detail).replace(/\n/g,"<br>")}</td></tr>
+      <tr><th>운전자</th><td>${escapeHtml(r.worker||"-")}</td></tr>
       <tr><th>정비처</th><td>${escapeHtml(r.repair_shop||"-")}</td></tr>
+      <tr><th>금액</th><td>${escapeHtml(formatAmountKrW(r.amount_krw))}</td></tr>
       <tr><th>특이사항</th><td>${escapeHtml(r.remarks||"-").replace(/\n/g,"<br>")}</td></tr>
     </table>
   </div>`;
   setTimeout(()=>window.print(),100);
 };
 
-function printLookupTable(title,date,headers,rows){
-  if(!rows.length){alert("출력할 조회 결과가 없습니다.");return;}
-  $("printSheet").innerHTML=`<div class="print-doc lookup-print-doc">
-    <div class="print-title">${escapeHtml(title)}</div>
-    <table class="print-table" style="margin-bottom:3mm">
-      <tr><th style="width:20%">조회일자</th><td>${escapeHtml(date)}</td></tr>
-    </table>
-    <table class="print-table">
-      <thead><tr>${headers.map(h=>`<th>${escapeHtml(h)}</th>`).join("")}</tr></thead>
-      <tbody>${rows.map(row=>`<tr>${row.map(v=>`<td>${escapeHtml(v??"")}</td>`).join("")}</tr>`).join("")}</tbody>
+function ledgerPages(rows,size=20){
+  const pages=[];
+  for(let i=0;i<rows.length;i+=size) pages.push(rows.slice(i,i+size));
+  return pages;
+}
+
+function renderLedgerPage(kind,date,allRows,rows,pageIndex,pageCount){
+  const isWork=kind==="work";
+  const title=isWork?"작업계획서 기록대장":"차량·장비 정비내역 기록대장";
+  const headers=isWork
+    ? ["작업일시","장비","소요시간","작업장소","운전자 및 작업자","작업내용","작성자"]
+    : ["정비일자","장비","정비내역","정비내용","운전자","정비처","금액","특이사항"];
+  const widths=isWork?[17,15,10,13,14,23,8]:[12,14,16,18,9,13,9,9];
+  const lineItems=[...rows];
+  while(lineItems.length<20) lineItems.push(Array(headers.length).fill(""));
+  const thead=headers.map((h,i)=>`<th style="width:${widths[i]}%">${escapeHtml(h)}</th>`).join("");
+  const tbody=lineItems.map((row,i)=>`<tr class="ledger-data-row">
+      ${row.map(v=>`<td><div class="ledger-clip">${escapeHtml(v??"")}</div></td>`).join("")}
+    </tr>`).join("");
+  return `<div class="print-doc ledger-page ${isWork?"work-ledger":"maintenance-ledger"}">
+    <div class="ledger-title">${escapeHtml(title)}</div>
+    <div class="ledger-meta">
+      <span>조회일자: ${escapeHtml(date)}</span>
+      <span>총 ${allRows.length}건 | ${pageIndex+1} / ${pageCount}페이지</span>
+    </div>
+    <table class="ledger-table">
+      <colgroup>${widths.map(w=>`<col style="width:${w}%">`).join("")}</colgroup>
+      <thead><tr>${thead}</tr></thead>
+      <tbody>${tbody}</tbody>
     </table>
   </div>`;
-  setTimeout(()=>window.print(),100);
+}
+
+function printLedgerTable(kind){
+  const isWork=kind==="work";
+  const source=isWork?lastWorkLookup:lastMaintenanceRecords;
+  if(!source.length){alert("출력할 조회 결과가 없습니다.");return;}
+  const date=$("queryDate").value;
+  const rows=isWork
+    ? source.map(r=>[
+        [r.date,[r.start,r.end].filter(Boolean).join("~")].filter(Boolean).join(" "),
+        (EQUIPMENT[r.equipmentKey]||{}).name||r.equipment||"",
+        compactDurationText(r.start,r.end,r.duration)||"",
+        r.place||"",
+        r.worker||"",
+        r.content||"",
+        r.writer||r.worker||""
+      ])
+    : source.map(r=>[
+        r.work_date||"",
+        r.equipment||"",
+        r.maintenance_item||"",
+        r.maintenance_detail||"",
+        r.worker||"",
+        r.repair_shop||"",
+        formatAmountKrW(r.amount_krw),
+        r.remarks||""
+      ]);
+  const chunks=ledgerPages(rows,20);
+  $("printSheet").innerHTML=chunks.map((chunk,i)=>renderLedgerPage(kind,date,rows,chunk,i,chunks.length)).join("");
+  setTimeout(()=>window.print(),120);
 }
 
 $("workLookupBtn").addEventListener("click",renderWorkLookup);
 $("maintenanceLookupBtn").addEventListener("click",renderMaintenanceLookup);
-$("printWorkLookupBtn").addEventListener("click",()=>{
-  const rows=lastWorkLookup.map(r=>[
-    r.date,
-    (EQUIPMENT[r.equipmentKey]||{}).name||r.equipment||"",
-    r.place||"",
-    workTimePrintText(r),
-    r.worker||"",
-    r.content||"",
-    r.remarks||""
-  ]);
-  printLookupTable("작업내역 조회",$("queryDate").value,
-    ["날짜","장비","작업장소","작업시간","작업자","작업내용","특이사항"],rows);
-});
-$("printMaintenanceLookupBtn").addEventListener("click",()=>{
-  printLookupTable("정비내역 조회",$("queryDate").value,lastMaintenanceLookup.headers,lastMaintenanceLookup.rows);
-});
+$("printWorkLookupBtn").addEventListener("click",()=>printLedgerTable("work"));
+$("printMaintenanceLookupBtn").addEventListener("click",()=>printLedgerTable("maintenance"));
 
 function renderMaintenanceItems(){
   const key=$("mEquipment").value;
@@ -1384,6 +1470,7 @@ function clearMaintenanceForm(keepDate=true){
   $("mItem").innerHTML='<option value="">장비를 먼저 선택하세요</option>';
   $("mWorker").value="";
   $("mShop").value="";
+  $("mAmount").value="";
   $("mDetail").value="";
   $("mRemarks").value="";
   $("mSourceNote").textContent="";
@@ -1395,6 +1482,11 @@ async function saveMaintenanceRecord(){
   const e=EQUIPMENT[key], date=$("mDate").value;
   const item=$("mItem").value, detail=$("mDetail").value.trim();
   const worker=$("mWorker").value, shop=$("mShop").value;
+  const rawAmount=$("mAmount").value.trim().replace(/,/g,"");
+  if(rawAmount && (!/^\\d+$/.test(rawAmount) || !Number.isSafeInteger(Number(rawAmount)))){
+    alert("금액은 0 이상의 숫자로 입력해주세요.");return;
+  }
+  const amountKrW=rawAmount?Number(rawAmount):null;
   if(!e){alert("장비를 선택해주세요.");return;}
   if(!date){alert("정비 날짜를 선택해주세요.");return;}
   if(!item){alert("정비내역을 선택해주세요. 직접 입력도 가능합니다.");return;}
@@ -1404,7 +1496,7 @@ async function saveMaintenanceRecord(){
   const payload={
     work_date:date,equipment_key:key,equipment:e.name,vehicle_no:e.vehicleNo,
     maintenance_item:item==="__manual__"?detail:item,maintenance_detail:detail,
-    worker,repair_shop:shop,remarks:$("mRemarks").value.trim()
+    worker,repair_shop:shop,amount_krw:amountKrW,remarks:$("mRemarks").value.trim()
   };
   const btn=$("mSaveBtn");btn.disabled=true;btn.textContent="저장 중...";
   try{
