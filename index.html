@@ -115,11 +115,15 @@
   }
   .print-route-image-cell{
     padding:0!important;text-align:center;background:#fff;
-    overflow:hidden;vertical-align:middle!important
+    overflow:hidden;position:relative;vertical-align:middle!important
+  }
+  .print-route-images{
+    position:absolute;inset:0;display:grid;grid-template-columns:minmax(0,1fr);
+    grid-auto-rows:minmax(0,1fr);overflow:hidden
   }
   .print-route-image-cell img{
-    display:block;width:100%;height:100%;max-width:none;max-height:none;
-    object-fit:contain;margin:0
+    display:block;width:100%;height:100%;min-width:0;min-height:0;
+    max-width:100%;max-height:100%;object-fit:fill;margin:0
   }
   .print-remarks{height:28px;font-size:11.2px!important}
   @media print{
@@ -131,7 +135,6 @@
     /* 개별 작업계획서는 전체 내용을 유지하고 beforeprint에서 한 장에 맞춘다. */
     .work-plan-print{min-height:0;max-height:none;overflow:visible;margin:0;display:flow-root}
     .work-plan-print td{overflow-wrap:anywhere}
-    .work-plan-print .print-route-image-cell img{height:43mm;max-height:43mm}
     .print-title{font-size:20pt;margin-bottom:5mm}
     .print-meta th,.print-meta td,.print-table th,.print-table td,
     .print-route-layout th,.print-route-layout td{
@@ -153,7 +156,7 @@
     }
     .print-route-image-cell{padding:0!important}
     .print-route-image-cell img{
-      width:100%;height:100%;max-height:none;object-fit:contain
+      width:100%;height:100%;max-height:100%;object-fit:fill
     }
     .print-remarks{height:7.5mm;font-size:9.4pt!important}
     .print-section,.print-route-layout,.print-checklist{
@@ -819,7 +822,7 @@ function routeImageHtml(key, place="", forPrint=false){
   const entries=getRouteImageEntries(key,place);
   if(!entries.length) return "";
   if(forPrint){
-    return entries.map(x=>`<img src="${x.src}" alt="">`).join("");
+    return `<div class="print-route-images">${entries.map(x=>`<img src="${x.src}" alt="${escapeHtml(x.label)}">`).join("")}</div>`;
   }
   if(entries.length===1){
     const x=entries[0];
