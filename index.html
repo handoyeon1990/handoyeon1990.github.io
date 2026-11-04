@@ -1483,7 +1483,7 @@ async function saveMaintenanceRecord(){
   const item=$("mItem").value, detail=$("mDetail").value.trim();
   const worker=$("mWorker").value, shop=$("mShop").value;
   const rawAmount=$("mAmount").value.trim().replace(/,/g,"");
-  if(rawAmount && (!/^\\d+$/.test(rawAmount) || !Number.isSafeInteger(Number(rawAmount)))){
+  if(rawAmount && (!/^\d+$/.test(rawAmount) || !Number.isSafeInteger(Number(rawAmount)))){
     alert("금액은 0 이상의 숫자로 입력해주세요.");return;
   }
   const amountKrW=rawAmount?Number(rawAmount):null;
