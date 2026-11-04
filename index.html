@@ -208,6 +208,11 @@
     }
     .sheet-frame{height:68vh;min-height:520px}
   }
+
+  .maintenance-form{max-width:900px;margin:0 auto}
+  .maintenance-form .fields{margin-top:12px}
+  .maintenance-form .field select,.maintenance-form .field input,.maintenance-form .field textarea{width:100%}
+  @media print{#page-maintenance{display:none!important}}
 </style>
 </head>
 <body>
@@ -352,19 +357,54 @@
 
 
 <section id="page-maintenance" class="app-page standalone-page">
-  <div class="card">
-    <div class="topline">
-      <div>
-        <h2 style="margin-bottom:4px">정비내역</h2>
-        <div class="small">기존 Google 스프레드시트를 사이트 안에서 사용합니다.</div>
+  <div class="card maintenance-form">
+    <h2>정비내역 작성</h2>
+    <div class="small" style="margin:0 0 16px">장비별 기존 정비항목을 선택하거나 새로운 정비내용을 직접 입력해 저장할 수 있습니다.</div>
+    <div class="fields">
+      <div class="field">
+        <label for="mEquipment">장비 선택</label>
+        <select id="mEquipment"><option value="">선택하세요</option></select>
       </div>
-      <a class="ghost" style="text-decoration:none;padding:9px 12px;border-radius:9px" target="_blank" rel="noopener"
-         href="https://docs.google.com/spreadsheets/d/1UuO3gaic1-Uf3QeWIpRutN46bzKXxtJLUR9-_LFx_RA/edit?gid=805477971#gid=805477971">스프레드시트 새 창으로 열기</a>
+      <div class="field">
+        <label for="mVehicleNo">차량번호</label>
+        <input id="mVehicleNo" readonly placeholder="장비 선택 시 자동 표시" />
+      </div>
+      <div class="field">
+        <label for="mDate">정비 날짜</label>
+        <input id="mDate" type="date" />
+      </div>
+      <div class="field">
+        <label for="mWorker">운전자 및 작업자</label>
+        <select id="mWorker"><option value="">선택하세요</option></select>
+      </div>
+      <div class="field wide">
+        <label for="mItem">정비내역 (기존 기록에서 선택)</label>
+        <select id="mItem"><option value="">장비를 먼저 선택하세요</option></select>
+        <div class="small" id="mSourceNote" style="margin-top:5px"></div>
+      </div>
+      <div class="field wide">
+        <label for="mDetail">정비내용 (상세내용 수정·추가 가능)</label>
+        <textarea id="mDetail" placeholder="선택한 정비내역을 확인하고 실제 수리·교체 내용을 입력하세요." style="min-height:95px"></textarea>
+      </div>
+      <div class="field wide">
+        <label for="mShop">정비처</label>
+        <select id="mShop">
+          <option value="">선택하세요</option>
+          <option value="금호타이어 화북점">금호타이어 화북점</option>
+          <option value="우성">우성</option>
+          <option value="산지공업사">산지공업사</option>
+        </select>
+      </div>
+      <div class="field wide">
+        <label for="mRemarks">특이사항</label>
+        <textarea id="mRemarks" placeholder="특이사항이 있으면 입력하세요. (선택)" style="min-height:86px"></textarea>
+      </div>
     </div>
-    <div class="sheet-note">스프레드시트에서 입력·수정한 정비내역을 그대로 사용합니다.</div>
-    <iframe class="sheet-frame"
-      src="https://docs.google.com/spreadsheets/d/1UuO3gaic1-Uf3QeWIpRutN46bzKXxtJLUR9-_LFx_RA/edit?gid=805477971&rm=minimal#gid=805477971"
-      title="정비내역 Google 스프레드시트"></iframe>
+    <div class="actions no-print">
+      <button id="mSaveBtn" class="primary" type="button">정비내역 저장</button>
+      <button id="mClearBtn" class="secondary" type="button">입력 초기화</button>
+      <span class="small" style="align-self:center">저장한 정비기록은 ‘작업 및 정비 내역 조회’에서 날짜별로 확인·출력합니다.</span>
+    </div>
   </div>
 </section>
 
@@ -416,6 +456,7 @@
 const SUPABASE_URL = "https://otbsdsiaybypsxydcjlp.supabase.co";
 const SUPABASE_KEY = "sb_publishable_ovMOnspIHlXbbfiu09ExHA_JqeG0cBq";
 const API_URL = `${SUPABASE_URL}/rest/v1/work_records`;
+const MAINTENANCE_API_URL = `${SUPABASE_URL}/rest/v1/maintenance_records`;
 let recordCache = [];
 
 async function apiRequest(url, options={}){
@@ -1185,10 +1226,12 @@ $("csvBtn").addEventListener("click",()=>{
 });
 
 
-const MAINTENANCE_SHEET_ID="1UuO3gaic1-Uf3QeWIpRutN46bzKXxtJLUR9-_LFx_RA";
-const MAINTENANCE_SHEET_GID="805477971";
+const MAINTENANCE_ITEMS={"sweeper":[],"water_new":[],"bongo":[],"porter":["배터리 교체(1개)","스타터모터 교체(재생)","타이어 교체(6본)","매연저감장치 클리닝 (DFP클리닝) 교체","엔진오일 교체","적재함 덮개 제작","후면유리 교체","에어컨 가스주입","조수석 후미등 교체","타이어 펑크 수리","소음기, 브레이크 패드 교체","에어컨 콘덴서, 콤프레셔 교체","라디에이터 교체, 매연제거작업 등","에어컨 콤프, 콘덴샤 교체 등","브레이크등 교체","클럭 스프링(에어백경고등) 교체","히터 컴플리트 교체"],"truck_5t":["작동유 교체(공임11만원 포함)","유압호스 구입","타이어 펑크 수리","엔진오일 교체","타이어 교체(4본, 전39만원 후30만원)","작동유 구입","펌프 실린더 탈부착(펌프68만원 공임등 25만원)","스프링챔버 및 브레이크밸브 교체","핸드브레이크 교체","유니버셜 조인트 베어링 교체","암롤 유압컨트롤 수리","악셀패달 교환 수리, 경고등 소거","에어컨 가스주입","유리창 썬팅","크락션 교체","메일커넥터 교체","번호판등 앗세이 브라켓교환, 에어혼 스위치변경","에어컨 컴프레셔 와샤 교체","브레이크밸브, 배터리단자 교체","배터리 교체(2개)","유압호스 자가 수리","타이어 교체(2본, 후33만원)","5톤 암롤 악셀패달 교체 및 배선작업(공임33만원)","흙받이 등 구입","고압 에어호스 등 구입(카플러장착)","암롤박스 보수용품 구입","브레이크등 및 너트구입","5톤 암롤 수동컨트롤 밸브 스프링, 유압호스 교체 및 자가 정비 (작동유도 보충)","유니버셜조인트앗세이 및 중간 센터 베어링 2EA 교환"],"water":["엔진오일 교체","배터리 교체(2개)","워터펌프 및 벨브 교체","물공급라인 탈부착 점검","에어컨 가스주입","운전석 문커버 탈부착 및 유리기어 교체","브레이크등 교환"],"loader_new":["엔진오일 교체","타이어 교체(2본)","에어컨 썸머콘(온도감지센서) 교체, 점검","신축솔 구입","스위퍼날 제작","배터리 교체 (GB100R 12V100AH)","스타터모터 교체","엔진오일, 오일필터등 교체","작동유 교체","유압호스 교체","에어컨 수리","엔진오일 교체(연료라인OH 포함)","에어컨 컨덴샤 교체 등","버켓날 수리 도색","작동유, 유압호스 교체","타이어 노튜브 휠벨브 교체","엔진오일 교체(자가교체)","에어컨 가스주입","버켓 볼트구입","타이어 교체(4본)","작동유 휠터 교체","버켓 유압호스 교환","에어컨 컴프레셔 교환 및 가스 충전","에어컨 연결배관(고무부싱)교환 및 에어컨 가스충전","제네레다 점검 및 벨트교환 출장","안전바 용 가스스프링 교체 (자가교체)","캐노피 가스쇼바 구입(자가교체)","버켓 보강에 따른 철판 제작","경광등 구입","배선수리","팬밸트 교환","에어컨 배선수리(소켓 과열에 따른 배선 끊김)"],"loader_old":["엔진오일 교체","타이어 교체(2본)","에어컨 팬벨트 교체, 점검","엔진오일, 오일필터등 교체","에어컨 수리","엔진오일 교체(연료라인OH 포함)","유압호스 교체","엔진오일 교체(자가교체)","에어컨 가스주입","배터리 교체(공임5만원)","냉각팬 및 쉬라우드 교체","스타트모터 교환","유압호스 교환 수리","거치형 선풍기 구입"]};
+const COMMON_MAINTENANCE_ITEMS=["엔진오일 교체","타이어 펑크 수리","타이어 교체(2본)","에어컨 가스주입","배터리 교체(2개)","유압호스 교체","브레이크등 교체","에어컨 수리"];
+const MAINTENANCE_EQUIPMENT_ORDER=["water_new","sweeper","truck_5t","porter","bongo","loader_new","loader_old","water"];
 let lastWorkLookup=[];
 let lastMaintenanceLookup={headers:[],rows:[]};
+let lastMaintenanceRecords=[];
 
 function showAppPage(name){
   document.querySelectorAll(".app-page").forEach(el=>el.classList.remove("active"));
@@ -1227,111 +1270,61 @@ function renderWorkLookup(){
   </tr>`).join("");
 }
 
-function cellMatchesDate(value,date){
-  const s=String(value??"").trim();
-  if(!s) return false;
-  const [y,m,d]=date.split("-").map(Number);
-  const dateCall=s.match(/Date\((\d{4}),(\d{1,2}),(\d{1,2})\)/);
-  if(dateCall) return Number(dateCall[1])===y && Number(dateCall[2])+1===m && Number(dateCall[3])===d;
-  const clean=s.replace(/년|월/g,"-").replace(/일/g,"").replace(/[.\/]/g,"-").replace(/\s+/g,"");
-  let mt=clean.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
-  if(mt) return Number(mt[1])===y && Number(mt[2])===m && Number(mt[3])===d;
-  mt=clean.match(/^(\d{1,2})-(\d{1,2})$/);
-  if(mt) return Number(mt[1])===m && Number(mt[2])===d;
-  return false;
-}
-
-function loadMaintenanceSheet(){
-  return new Promise((resolve,reject)=>{
-    const script=document.createElement("script");
-    const oldGoogle=window.google;
-    window.google=window.google||{};
-    window.google.visualization=window.google.visualization||{};
-    window.google.visualization.Query=window.google.visualization.Query||{};
-    const oldSet=window.google.visualization.Query.setResponse;
-    let finished=false;
-    const cleanup=()=>{
-      if(script.parentNode) script.parentNode.removeChild(script);
-      clearTimeout(timer);
-      if(oldSet) window.google.visualization.Query.setResponse=oldSet;
-      else delete window.google.visualization.Query.setResponse;
-      if(!oldGoogle && window.google && Object.keys(window.google).length===0) delete window.google;
-    };
-    window.google.visualization.Query.setResponse=(resp)=>{
-      if(finished) return;
-      finished=true;
-      cleanup();
-      if(!resp || resp.status==="error"){reject(new Error("정비 스프레드시트 데이터를 읽지 못했습니다."));return;}
-      resolve(resp);
-    };
-    script.onerror=()=>{
-      if(finished) return;
-      finished=true;cleanup();reject(new Error("정비 스프레드시트 연결에 실패했습니다."));
-    };
-    const timer=setTimeout(()=>{
-      if(finished) return;
-      finished=true;cleanup();reject(new Error("정비 스프레드시트 응답이 없습니다."));
-    },10000);
-    script.src=`https://docs.google.com/spreadsheets/d/${MAINTENANCE_SHEET_ID}/gviz/tq?gid=${MAINTENANCE_SHEET_GID}&headers=0&tqx=out:json&_=${Date.now()}`;
-    document.head.appendChild(script);
-  });
-}
-
-function maintenanceMatrix(resp){
-  const table=resp.table||{};
-  return (table.rows||[]).map(r=>(r.c||[]).map(c=>c ? (c.f ?? c.v ?? "") : ""));
-}
-
-function detectMaintenanceHeader(matrix){
-  const keys=/날짜|일자|정비|장비|차량|내용|항목|비고|금액|업체|주행|작성|수리/;
-  let best={idx:0,score:-1};
-  matrix.slice(0,15).forEach((row,idx)=>{
-    const nonempty=row.filter(v=>String(v).trim()).length;
-    const kw=row.reduce((n,v)=>n+(keys.test(String(v))?1:0),0);
-    const score=kw*10+nonempty;
-    if(score>best.score) best={idx,score};
-  });
-  return best.idx;
-}
-
 async function renderMaintenanceLookup(){
   const date=$("queryDate").value;
   if(!date){alert("조회 날짜를 선택해주세요.");return;}
   $("workQuerySection").style.display="none";
   $("maintenanceQuerySection").style.display="block";
   const box=$("maintenanceLookupResult");
-  box.innerHTML='<div class="query-empty">정비내역을 불러오는 중...</div>';
+  box.innerHTML='<div class="query-empty">정비기록을 불러오는 중...</div>';
+  const btn=$("maintenanceLookupBtn");btn.disabled=true;
   try{
-    const resp=await loadMaintenanceSheet();
-    const matrix=maintenanceMatrix(resp);
-    if(!matrix.length){throw new Error("스프레드시트에 조회할 데이터가 없습니다.");}
-    const headerIdx=detectMaintenanceHeader(matrix);
-    let headers=(matrix[headerIdx]||[]).map((v,i)=>String(v||"").trim()||`항목 ${i+1}`);
-    let rows=matrix.slice(headerIdx+1).filter(row=>row.some(v=>String(v??"").trim()));
-    const dateCol=headers.findIndex(h=>/날짜|일자|정비일|작업일|일시/.test(h));
-    rows=rows.filter(row=>{
-      if(dateCol>=0) return cellMatchesDate(row[dateCol],date);
-      return row.some(v=>cellMatchesDate(v,date));
-    });
-    const usedCols=headers.map((_,i)=>i).filter(i=>headers[i] || rows.some(r=>String(r[i]??"").trim()));
-    headers=usedCols.map(i=>headers[i]);
-    rows=rows.map(r=>usedCols.map(i=>r[i]??""));
-    lastMaintenanceLookup={headers,rows};
-    if(!rows.length){
-      box.innerHTML='<div class="query-empty">해당 날짜의 정비내역이 없습니다.</div>';
+    const url=`${MAINTENANCE_API_URL}?select=*&work_date=eq.${encodeURIComponent(date)}&order=created_at.desc`;
+    lastMaintenanceRecords=(await apiRequest(url,{method:"GET",headers:{"Accept":"application/json"}}))||[];
+    lastMaintenanceLookup={
+      headers:["날짜","장비","정비내역","정비내용","운전자 및 작업자","정비처","특이사항"],
+      rows:lastMaintenanceRecords.map(r=>[r.work_date,r.equipment,r.maintenance_item,r.maintenance_detail,r.worker||"",r.repair_shop||"",r.remarks||""])
+    };
+    if(!lastMaintenanceRecords.length){
+      box.innerHTML='<div class="query-empty">해당 날짜에 사이트에서 저장한 정비기록이 없습니다.</div>';
       return;
     }
-    box.innerHTML=`<table class="query-table"><thead><tr>${headers.map(h=>`<th>${escapeHtml(h)}</th>`).join("")}</tr></thead>
-      <tbody>${rows.map(row=>`<tr>${row.map(v=>`<td>${escapeHtml(v)}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
+    box.innerHTML=`<table class="query-table">
+      <thead><tr><th>날짜</th><th>장비</th><th>정비내역</th><th>정비내용</th><th>작업자</th><th>정비처</th><th>특이사항</th><th>출력</th></tr></thead>
+      <tbody>${lastMaintenanceRecords.map(r=>`<tr>
+        <td>${escapeHtml(r.work_date)}</td>
+        <td>${escapeHtml(r.equipment||"")}</td>
+        <td>${escapeHtml(r.maintenance_item||"")}</td>
+        <td>${escapeHtml(r.maintenance_detail||"")}</td>
+        <td>${escapeHtml(r.worker||"")}</td>
+        <td>${escapeHtml(r.repair_shop||"")}</td>
+        <td>${escapeHtml(r.remarks||"")}</td>
+        <td><button class="ghost" type="button" onclick="printMaintenanceRecord(${Number(r.id)})">출력</button></td>
+      </tr>`).join("")}</tbody>
+    </table>`;
   }catch(err){
-    console.error(err);
-    lastMaintenanceLookup={headers:[],rows:[]};
-    box.innerHTML=`<div class="query-empty">정비내역 자동조회에 실패했습니다.<br>
-      Google 스프레드시트의 접근 권한에 따라 자동조회가 제한될 수 있습니다.<br><br>
-      <a target="_blank" rel="noopener" href="https://docs.google.com/spreadsheets/d/${MAINTENANCE_SHEET_ID}/edit?gid=${MAINTENANCE_SHEET_GID}#gid=${MAINTENANCE_SHEET_GID}">원본 스프레드시트 열기</a>
-    </div>`;
-  }
+    console.error(err);lastMaintenanceRecords=[];lastMaintenanceLookup={headers:[],rows:[]};
+    box.innerHTML='<div class="query-empty">정비기록 조회에 실패했습니다. 서버 연결 상태를 확인해주세요.</div>';
+  }finally{btn.disabled=false;}
 }
+
+window.printMaintenanceRecord=id=>{
+  const r=lastMaintenanceRecords.find(x=>x.id===id);
+  if(!r){alert("정비기록을 찾지 못했습니다.");return;}
+  $("printSheet").innerHTML=`<div class="print-doc lookup-print-doc">
+    <div class="print-title">차량·장비 정비내역서</div>
+    <table class="print-meta">
+      <tr><th style="width:20%">정비 날짜</th><td>${escapeHtml(r.work_date)}</td></tr>
+      <tr><th>장비명 / 차량번호</th><td>${escapeHtml(r.equipment)} / ${escapeHtml(r.vehicle_no||"-")}</td></tr>
+      <tr><th>정비내역</th><td>${escapeHtml(r.maintenance_item)}</td></tr>
+      <tr><th>정비내용</th><td style="min-height:20mm">${escapeHtml(r.maintenance_detail).replace(/\n/g,"<br>")}</td></tr>
+      <tr><th>운전자 및 작업자</th><td>${escapeHtml(r.worker||"-")}</td></tr>
+      <tr><th>정비처</th><td>${escapeHtml(r.repair_shop||"-")}</td></tr>
+      <tr><th>특이사항</th><td>${escapeHtml(r.remarks||"-").replace(/\n/g,"<br>")}</td></tr>
+    </table>
+  </div>`;
+  setTimeout(()=>window.print(),100);
+};
 
 function printLookupTable(title,date,headers,rows){
   if(!rows.length){alert("출력할 조회 결과가 없습니다.");return;}
@@ -1367,7 +1360,86 @@ $("printMaintenanceLookupBtn").addEventListener("click",()=>{
   printLookupTable("정비내역 조회",$("queryDate").value,lastMaintenanceLookup.headers,lastMaintenanceLookup.rows);
 });
 
+function renderMaintenanceItems(){
+  const key=$("mEquipment").value;
+  const e=EQUIPMENT[key];
+  $("mVehicleNo").value=e?.vehicleNo||"";
+  const specific=MAINTENANCE_ITEMS[key]||[];
+  const entries=specific.length?specific:COMMON_MAINTENANCE_ITEMS;
+  const seen=new Set();
+  const opts=entries.filter(v=>!seen.has(v)&&seen.add(v));
+  const select=$("mItem");
+  select.innerHTML='<option value="">선택하세요</option>'+opts.map(v=>`<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join("")
+    +'<option value="__manual__">직접 입력 (새로운 정비내용)</option>';
+  $("mSourceNote").textContent=key && specific.length
+    ? "해당 장비 스프레드시트의 기존 정비내역을 참고한 선택지입니다."
+    : key ? "해당 장비에 과거 정비기록이 없어 다른 장비의 공통 정비항목을 표시합니다. 직접 입력 가능합니다."
+          : "";
+  $("mDetail").value="";
+}
+
+function clearMaintenanceForm(keepDate=true){
+  $("mEquipment").value="";
+  $("mVehicleNo").value="";
+  $("mItem").innerHTML='<option value="">장비를 먼저 선택하세요</option>';
+  $("mWorker").value="";
+  $("mShop").value="";
+  $("mDetail").value="";
+  $("mRemarks").value="";
+  $("mSourceNote").textContent="";
+  if(!keepDate) $("mDate").value="";
+}
+
+async function saveMaintenanceRecord(){
+  const key=$("mEquipment").value;
+  const e=EQUIPMENT[key], date=$("mDate").value;
+  const item=$("mItem").value, detail=$("mDetail").value.trim();
+  const worker=$("mWorker").value, shop=$("mShop").value;
+  if(!e){alert("장비를 선택해주세요.");return;}
+  if(!date){alert("정비 날짜를 선택해주세요.");return;}
+  if(!item){alert("정비내역을 선택해주세요. 직접 입력도 가능합니다.");return;}
+  if(!detail){alert("정비내용을 입력해주세요.");return;}
+  if(!worker){alert("운전자 및 작업자를 선택해주세요.");return;}
+  if(!shop){alert("정비처를 선택해주세요.");return;}
+  const payload={
+    work_date:date,equipment_key:key,equipment:e.name,vehicle_no:e.vehicleNo,
+    maintenance_item:item==="__manual__"?detail:item,maintenance_detail:detail,
+    worker,repair_shop:shop,remarks:$("mRemarks").value.trim()
+  };
+  const btn=$("mSaveBtn");btn.disabled=true;btn.textContent="저장 중...";
+  try{
+    await apiRequest(MAINTENANCE_API_URL,{
+      method:"POST",headers:{"Prefer":"return=minimal"},body:JSON.stringify(payload)
+    });
+    alert("정비내역을 저장했습니다. 날짜별 조회 메뉴에서 확인할 수 있습니다.");
+    clearMaintenanceForm(true);
+  }catch(err){
+    console.error(err);
+    alert("정비내역을 저장하지 못했습니다. 서버 연결 또는 권한을 확인해주세요. ("+String(err.message).slice(0,180)+")");
+  }finally{btn.disabled=false;btn.textContent="정비내역 저장";}
+}
+
+function initMaintenanceForm(){
+  const sel=$("mEquipment");
+  MAINTENANCE_EQUIPMENT_ORDER.forEach(key=>{
+    const e=EQUIPMENT[key];
+    if(!e) return;
+    const opt=document.createElement("option");opt.value=key;opt.textContent=e.name;sel.appendChild(opt);
+  });
+  $("mWorker").innerHTML=$("worker").innerHTML;
+  $("mDate").value=$("workDate").value;
+  sel.addEventListener("change",renderMaintenanceItems);
+  $("mItem").addEventListener("change",()=>{
+    const item=$("mItem").value;
+    $("mDetail").value=item==="__manual__"?"":item;
+    if(item==="__manual__") $("mDetail").focus();
+  });
+  $("mClearBtn").addEventListener("click",()=>clearMaintenanceForm(true));
+  $("mSaveBtn").addEventListener("click",saveMaintenanceRecord);
+}
+
 fillTimeOptions();
+initMaintenanceForm();
 $("supervisor").value="한도연";
 renderEquipment();
 $("historyBody").innerHTML=`<tr><td colspan="7" class="empty">온라인 기록을 불러오는 중...</td></tr>`;
