@@ -140,7 +140,8 @@
     #printSheet{display:block!important;margin:0;padding:0}
     .print-doc{width:200mm;min-height:275mm;max-height:275mm;margin:0 auto;overflow:hidden}
     /* 개별 작업계획서는 전체 내용을 유지하고 beforeprint에서 한 장에 맞춘다. */
-    .work-plan-print{min-height:0;max-height:none;overflow:visible;margin:0;display:flow-root}
+    .work-plan-print{break-after:page;page-break-after:always;min-height:0;max-height:none;overflow:visible;margin:0;display:flow-root}
+    .work-plan-print:last-child{break-after:auto;page-break-after:auto}
     .work-plan-print td{overflow-wrap:anywhere}
     .print-title{font-size:20pt;margin-bottom:5mm}
     .print-meta th,.print-meta td,.print-table th,.print-table td,
@@ -199,7 +200,8 @@
   .query-controls{
     display:flex;gap:8px;align-items:end;flex-wrap:wrap;margin-top:10px
   }
-  .query-controls .field{min-width:220px}
+  .query-controls .field{min-width:180px}
+  .query-controls [hidden]{display:none!important}
   .query-result{margin-top:16px}
   .query-result h3{margin:0 0 10px}
   .query-table-wrap{overflow:auto}
@@ -468,11 +470,19 @@
 <section id="page-query" class="app-page standalone-page">
   <div class="card">
     <h2>작업 및 정비 내역 조회</h2>
-    <div class="small">날짜를 선택한 뒤 작업조회 또는 정비내역조회를 각각 실행하세요.</div>
+    <div class="small">단일 날짜 또는 기간을 선택하고 조회한 뒤, 개별·일괄 출력이나 기록대장 출력을 이용하세요.</div>
     <div class="query-controls">
       <div class="field">
-        <label for="queryDate">조회 날짜</label>
+        <label for="queryMode">조회 방식</label>
+        <select id="queryMode"><option value="single">단일 날짜</option><option value="range">기간</option></select>
+      </div>
+      <div class="field">
+        <label for="queryDate" id="queryDateLabel">조회 날짜</label>
         <input type="date" id="queryDate" />
+      </div>
+      <div class="field" id="queryEndField" hidden>
+        <label for="queryEndDate">종료일</label>
+        <input type="date" id="queryEndDate" />
       </div>
       <button class="primary" id="workLookupBtn" type="button">작업조회</button>
       <button class="secondary" id="maintenanceLookupBtn" type="button">정비내역조회</button>
@@ -486,6 +496,7 @@
   <section class="card query-result" id="workQuerySection" style="display:none">
     <div class="topline">
       <h3>작업조회 결과</h3>
+      <button class="primary no-print" id="printWorkPlansBtn" type="button">조회된 작업계획서 일괄 출력</button>
       <button class="ghost no-print" id="printWorkLookupBtn" type="button">기록대장 출력 (20건/장)</button>
     </div>
     <div class="query-table-wrap">
@@ -1195,8 +1206,9 @@ function buildPrintSheet(data){
 // beforeprint runs with print media styles, so measurement includes printed fonts,
 // table wrapping and the loaded route image. Leave 1 mm for rounding at page edges.
 function fitWorkPlanToPage(){
-  const doc=$("printSheet").querySelector(".work-plan-print");
-  if(!doc) return;
+  $("printSheet").querySelectorAll(".work-plan-print").forEach(fitWorkPlanDocument);
+}
+function fitWorkPlanDocument(doc){
   doc.style.zoom="1";
   const mm=document.createElement("div");
   mm.style.cssText="position:absolute;width:1mm;height:1mm;visibility:hidden";
@@ -1218,8 +1230,7 @@ function fitWorkPlanToPage(){
 }
 window.addEventListener("beforeprint",fitWorkPlanToPage);
 window.addEventListener("afterprint",()=>{
-  const doc=$("printSheet").querySelector(".work-plan-print");
-  if(doc) doc.style.zoom="";
+  $("printSheet").querySelectorAll(".work-plan-print").forEach(doc=>doc.style.zoom="");
 });
 
 function renderHistory(){
@@ -1238,7 +1249,7 @@ function renderHistory(){
   }).join("");
 }
 window.printRecord=id=>{
-  const r=records().find(x=>x.id===id);
+  const r=records().find(x=>x.id===id)||lastWorkLookup.find(x=>x.id===id);
   if(!r){
     alert("저장된 기록을 찾을 수 없습니다.");
     return;
@@ -1334,15 +1345,75 @@ function renderHistory(){
   if(body) body.innerHTML="";
 }
 
-function renderWorkLookup(){
-  const date=$("queryDate").value;
-  if(!date){alert("조회 날짜를 선택해주세요.");return;}
-  lastWorkLookup=records().filter(r=>r.date===date);
+
+let lastWorkRange=null, lastMaintenanceRange=null;
+function getQueryRange(){
+  const start=$("queryDate").value;
+  const end=$("queryMode").value==="range"?$("queryEndDate").value:start;
+  if(!start||!end){alert("조회 날짜를 모두 선택해주세요.");return null;}
+  if(start>end){alert("종료일은 시작일 이후로 선택해주세요.");return null;}
+  return {start,end,label:start===end?start:start+" ~ "+end};
+}
+function syncQueryMode(){
+  const range=$("queryMode").value==="range";
+  $("queryEndField").hidden=!range;
+  $("queryDateLabel").textContent=range?"시작일":"조회 날짜";
+  if(range&&!$("queryEndDate").value) $("queryEndDate").value=$("queryDate").value;
+}
+$("queryMode").addEventListener("change",syncQueryMode);
+async function fetchDateRange(base,range){
+  const rows=[];
+  // Keep requesting pages so longer periods are not cut off by the API row limit.
+  for(let offset=0;;){
+    const url=base+"?select=*&work_date=gte."+encodeURIComponent(range.start)+
+      "&work_date=lte."+encodeURIComponent(range.end)+"&order=work_date.asc,id.asc&limit=500&offset="+offset;
+    const page=(await apiRequest(url,{method:"GET",headers:{Accept:"application/json"}}))||[];
+    if(!page.length) return rows;
+    rows.push(...page);offset+=page.length;
+  }
+}
+function mapLookupWorkRecord(r){return {
+      id: r.id,
+      date: r.work_date,
+      equipmentKey: r.equipment_key,
+      equipment: r.equipment,
+      vehicleNo: r.vehicle_no,
+      place: r.place || "",
+      start: r.start_time || "",
+      end: r.end_time || "",
+      duration: r.duration || "",
+      worker: r.worker || "",
+      content: r.content || "",
+      remarks: r.remarks || "",
+      writer: r.writer || "",
+      supervisor: r.supervisor || "한도연",
+      checks: []
+    };}
+async function printWorkPlans(){
+  if(!lastWorkLookup.length){alert("출력할 조회 결과가 없습니다.");return;}
+  try{
+    const pages=lastWorkLookup.map(r=>{buildPrintSheet(r);return $("printSheet").innerHTML;});
+    $("printSheet").innerHTML=pages.join("");
+    const images=[...$("printSheet").querySelectorAll("img")];
+    await Promise.all([document.fonts.ready,...images.map(img=>img.decode().catch(()=>{}))]);
+    window.print();
+  }catch(err){console.error(err);alert("작업계획서를 준비하지 못했습니다. 다시 조회 후 출력해주세요.");}
+}
+
+async function renderWorkLookup(){
+  const range=getQueryRange();if(!range)return;
+  const btn=$("workLookupBtn");btn.disabled=true;
+  lastWorkLookup=[];lastWorkRange=null;
+  try{
+    lastWorkLookup=(await fetchDateRange(API_URL,range)).map(mapLookupWorkRecord);
+    lastWorkRange=range;
+  }catch(err){console.error(err);alert("작업기록을 불러오지 못했습니다. 다시 조회해주세요.");return;}
+  finally{btn.disabled=false;}
   $("maintenanceQuerySection").style.display="none";
   $("workQuerySection").style.display="block";
   const body=$("workLookupBody");
   if(!lastWorkLookup.length){
-    body.innerHTML='<tr><td colspan="8" class="query-empty">해당 날짜의 작업기록이 없습니다.</td></tr>';
+    body.innerHTML='<tr><td colspan="8" class="query-empty">선택한 날짜 또는 기간의 작업기록이 없습니다.</td></tr>';
     return;
   }
   body.innerHTML=lastWorkLookup.map(r=>`<tr>
@@ -1358,23 +1429,23 @@ function renderWorkLookup(){
 }
 
 async function renderMaintenanceLookup(){
-  const date=$("queryDate").value;
-  if(!date){alert("조회 날짜를 선택해주세요.");return;}
+  const range=getQueryRange();if(!range)return;
+  lastMaintenanceRecords=[];lastMaintenanceRange=null;
   $("workQuerySection").style.display="none";
   $("maintenanceQuerySection").style.display="block";
   const box=$("maintenanceLookupResult");
   box.innerHTML='<div class="query-empty">정비기록을 불러오는 중...</div>';
   const btn=$("maintenanceLookupBtn");btn.disabled=true;
   try{
-    const url=`${MAINTENANCE_API_URL}?select=*&work_date=eq.${encodeURIComponent(date)}&order=created_at.desc`;
-    lastMaintenanceRecords=(await apiRequest(url,{method:"GET",headers:{"Accept":"application/json"}}))||[];
+    lastMaintenanceRecords=await fetchDateRange(MAINTENANCE_API_URL,range);
+    lastMaintenanceRange=range;
     lastMaintenanceLookup={
       headers:["정비일자","장비","정비내역","정비내용","운전자","정비처","금액","특이사항"],
       rows:lastMaintenanceRecords.map(r=>[r.work_date,r.equipment,r.maintenance_item,r.maintenance_detail,
         r.worker||"",r.repair_shop||"",formatAmountKrW(r.amount_krw),r.remarks||""])
     };
     if(!lastMaintenanceRecords.length){
-      box.innerHTML='<div class="query-empty">해당 날짜에 사이트에서 저장한 정비기록이 없습니다.</div>';
+      box.innerHTML='<div class="query-empty">선택한 날짜 또는 기간에 저장한 정비기록이 없습니다.</div>';
       return;
     }
     box.innerHTML=`<table class="query-table">
@@ -1444,7 +1515,7 @@ function renderLedgerPage(kind,date,allRows,rows,pageIndex,pageCount){
   return `<div class="print-doc ledger-page ${isWork?"work-ledger":"maintenance-ledger"}">
     <div class="ledger-title">${escapeHtml(title)}</div>
     <div class="ledger-meta">
-      <span>조회일자: ${escapeHtml(date)}</span>
+      <span>조회 날짜/기간: ${escapeHtml(date)}</span>
       <span>총 ${allRows.length}건 | ${pageIndex+1} / ${pageCount}페이지</span>
     </div>
     <table class="ledger-table">
@@ -1459,7 +1530,7 @@ function printLedgerTable(kind){
   const isWork=kind==="work";
   const source=isWork?lastWorkLookup:lastMaintenanceRecords;
   if(!source.length){alert("출력할 조회 결과가 없습니다.");return;}
-  const date=$("queryDate").value;
+  const date=(isWork?lastWorkRange:lastMaintenanceRange)?.label||"";
   const rows=isWork
     ? source.map(r=>[
         [r.date,[r.start,r.end].filter(Boolean).join("~")].filter(Boolean).join(" "),
@@ -1487,6 +1558,7 @@ function printLedgerTable(kind){
 
 $("workLookupBtn").addEventListener("click",renderWorkLookup);
 $("maintenanceLookupBtn").addEventListener("click",renderMaintenanceLookup);
+$("printWorkPlansBtn").addEventListener("click",printWorkPlans);
 $("printWorkLookupBtn").addEventListener("click",()=>printLedgerTable("work"));
 $("printMaintenanceLookupBtn").addEventListener("click",()=>printLedgerTable("maintenance"));
 
