@@ -124,10 +124,14 @@
   .print-remarks{height:28px;font-size:11.2px!important}
   @media print{
     @page{size:A4 portrait;margin:17mm 5mm 5mm 5mm}
-    html,body{width:210mm;height:297mm;background:#fff;margin:0}
+    html,body{width:auto;height:auto;background:#fff;margin:0;padding:0}
     body > header,main,.side-menu,#page-maintenance,#page-query{display:none!important}
     #printSheet{display:block!important;margin:0;padding:0}
     .print-doc{width:200mm;min-height:275mm;max-height:275mm;margin:0 auto;overflow:hidden}
+    /* 개별 작업계획서는 전체 내용을 유지하고 beforeprint에서 한 장에 맞춘다. */
+    .work-plan-print{min-height:0;max-height:none;overflow:visible;margin:0;display:flow-root}
+    .work-plan-print td{overflow-wrap:anywhere}
+    .work-plan-print .print-route-image-cell img{height:43mm;max-height:43mm}
     .print-title{font-size:20pt;margin-bottom:5mm}
     .print-meta th,.print-meta td,.print-table th,.print-table td,
     .print-route-layout th,.print-route-layout td{
@@ -1094,7 +1098,7 @@ function buildPrintSheet(data){
   const routeHtml=routeImageHtml(key,data.place||"",true);
 
   $("printSheet").innerHTML=`
-    <div class="print-doc">
+    <div class="print-doc work-plan-print">
       <div class="print-title">${escapeHtml(e.category)} 작업계획서</div>
 
       <table class="print-meta">
@@ -1178,6 +1182,36 @@ function buildPrintSheet(data){
     </div>`;
 }
 
+// beforeprint runs with print media styles, so measurement includes printed fonts,
+// table wrapping and the loaded route image. Leave 1 mm for rounding at page edges.
+function fitWorkPlanToPage(){
+  const doc=$("printSheet").querySelector(".work-plan-print");
+  if(!doc) return;
+  doc.style.zoom="1";
+  const mm=document.createElement("div");
+  mm.style.cssText="position:absolute;width:1mm;height:1mm;visibility:hidden";
+  doc.appendChild(mm);
+  const pxPerMm=mm.getBoundingClientRect().height;
+  mm.remove();
+  const height=Math.max(doc.scrollHeight,doc.getBoundingClientRect().height);
+  const width=Math.max(doc.scrollWidth,doc.getBoundingClientRect().width);
+  let scale=Math.min(1,274*pxPerMm/height,199*pxPerMm/width);
+  doc.style.zoom=String(scale);
+  // Fractional font and table sizing can change slightly after zoom.
+  for(let i=0;i<4;i++){
+    const rect=doc.getBoundingClientRect();
+    const correction=Math.min(1,274*pxPerMm/rect.height,199*pxPerMm/rect.width);
+    if(correction>=1) break;
+    scale*=correction*.998;
+    doc.style.zoom=String(scale);
+  }
+}
+window.addEventListener("beforeprint",fitWorkPlanToPage);
+window.addEventListener("afterprint",()=>{
+  const doc=$("printSheet").querySelector(".work-plan-print");
+  if(doc) doc.style.zoom="";
+});
+
 function renderHistory(){
   const arr=records(), body=$("historyBody");
   if(!arr.length){body.innerHTML=`<tr><td colspan="7" class="empty">저장된 작업 기록이 없습니다.</td></tr>`;return;}
@@ -1203,7 +1237,7 @@ window.printRecord=id=>{
     buildPrintSheet(r);
     const imgs=[...$("printSheet").querySelectorAll("img")];
     const waits=imgs.map(img=>img.complete ? Promise.resolve() : new Promise(resolve=>{img.onload=resolve;img.onerror=resolve;}));
-    Promise.all(waits).then(()=>setTimeout(()=>window.print(),150));
+    Promise.all([...waits,document.fonts.ready]).then(()=>setTimeout(()=>window.print(),150));
   }catch(err){
     console.error(err);
     alert("출력 화면을 만드는 중 오류가 발생했습니다. 새로고침 후 다시 시도해주세요.");
