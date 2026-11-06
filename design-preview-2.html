@@ -284,7 +284,7 @@
 @media screen{
  .photo-field{margin-top:22px}.photo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(135px,1fr));gap:12px;margin-top:12px}
  .photo-tile{border:1px solid #dce3e7;padding:9px;min-width:0;display:flex;flex-direction:column;gap:8px}
- .photo-tile img{width:100%;height:125px;object-fit:cover;background:#f4f7f8}.photo-tile span{font-size:12px;overflow-wrap:anywhere}
+ .photo-tile span{font-size:12px;overflow-wrap:anywhere}
  #recordPhotoDialog{width:min(920px,94vw);max-height:88vh;overflow:auto;border:1px solid #cfd7df;padding:22px;color:#263d4c;background:#fff}
  #recordPhotoDialog::backdrop{background:#07182499}#recordPhotoDialog .topline{flex-wrap:wrap}#recordPhotoDialog button{font-family:inherit}
 }
@@ -2080,17 +2080,17 @@ function photoNameToken(name){return btoa(String.fromCharCode(...new TextEncoder
 function photoFileName(name){try{let token=name.split('__').slice(1).join('__');token=token.replace(/-/g,'+').replace(/_/g,'/');token+='='.repeat((4-token.length%4)%4);return new TextDecoder().decode(Uint8Array.from(atob(token),c=>c.charCodeAt(0)));}catch{return name;}}
 function renderPendingPhotos(kind){
  const box=$(kind==='work'?'workPhotoSelection':'maintenancePhotoSelection');
- box.innerHTML=photoPending[kind].map((p,i)=>`<div class="photo-tile"><img src="${p.url}" alt="선택한 사진" onerror="this.hidden=true"><span>${escapeHtml(p.file.name)}</span><button class="ghost" type="button" onclick="removePendingPhoto('${kind}',${i})">선택 취소</button></div>`).join('');
+ box.innerHTML=photoPending[kind].map((p,i)=>`<div class="photo-tile"><span>${escapeHtml(p.file.name)}</span><button class="ghost" type="button" onclick="removePendingPhoto('${kind}',${i})">선택 취소</button></div>`).join('');
 }
-function resetPendingPhotos(kind){for(const p of photoPending[kind])URL.revokeObjectURL(p.url);photoPending[kind]=[];photoInput(kind).value='';renderPendingPhotos(kind);}
-function removePendingPhoto(kind,index){if(photoBusy[kind])return;const [p]=photoPending[kind].splice(index,1);if(p)URL.revokeObjectURL(p.url);renderPendingPhotos(kind);}
+function resetPendingPhotos(kind){photoPending[kind]=[];photoInput(kind).value='';renderPendingPhotos(kind);}
+function removePendingPhoto(kind,index){if(photoBusy[kind])return;const [p]=photoPending[kind].splice(index,1);renderPendingPhotos(kind);}
 function pickRecordPhotos(kind,event){
  if(photoBusy[kind])return;
  const files=[...event.target.files];event.target.value='';
  if(photoPending[kind].length+files.length>10){alert('사진은 기록당 최대 10장까지 첨부할 수 있습니다.');return;}
  const allowed=/\.(jpe?g|png|webp|heic|heif|gif)$/i;
  if(files.some(f=>!allowed.test(f.name)||f.size>20*1024*1024||f.size===0)){alert('사진 파일만 첨부해주세요. 한 장당 최대 20MB입니다.');return;}
- for(const file of files){if(photoPending[kind].some(p=>p.file.name===file.name&&p.file.size===file.size&&p.file.lastModified===file.lastModified))continue;photoPending[kind].push({file,url:URL.createObjectURL(file),name:crypto.randomUUID()+'__'+photoNameToken(file.name)});}
+ for(const file of files){if(photoPending[kind].some(p=>p.file.name===file.name&&p.file.size===file.size&&p.file.lastModified===file.lastModified))continue;photoPending[kind].push({file,name:crypto.randomUUID()+'__'+photoNameToken(file.name)});}
  renderPendingPhotos(kind);
 }
 async function storageRequest(path,options={}){
@@ -2119,7 +2119,7 @@ async function uploadPendingPhotos(kind,id){
    const mime=({'jpg':'image/jpeg','jpeg':'image/jpeg','png':'image/png','webp':'image/webp','heic':'image/heic','heif':'image/heif','gif':'image/gif'})[ext];
    try{await storageRequest('object/'+storagePhotoPath(path),{method:'POST',headers:{'Content-Type':mime,'x-upsert':'false'},body:p.file});}
    catch(err){const existing=await listRecordPhotos(kind,id).catch(()=>[]);if(!existing.some(f=>f.path===path))throw err;}
-   photoPending[kind].shift();URL.revokeObjectURL(p.url);renderPendingPhotos(kind);
+   photoPending[kind].shift();renderPendingPhotos(kind);
   }
  }catch(err){throw Error('기록은 저장됐지만 일부 사진을 첨부하지 못했습니다. 남은 사진을 다시 저장해주세요. '+err.message);}
  finally{photoBusy[kind]=false;photoInput(kind).disabled=false;clear.disabled=false;}
@@ -2129,9 +2129,8 @@ async function showRecordPhotos(kind,id){
  if(!dialog.open)dialog.showModal();
  try{
   const files=await listRecordPhotos(kind,id);if(photoViewing.kind!==kind||photoViewing.id!==id)return;photoViewing.files=files;
-  $('photoGallery').innerHTML=files.length?files.map((f,i)=>`<div class="photo-tile"><img id="storedPhoto${i}" loading="lazy" alt="${escapeHtml(f.name)}"><span>${escapeHtml(f.name)}</span><button class="ghost" type="button" onclick="downloadRecordPhoto(${i},this)">사진 다운로드</button></div>`).join(''):'첨부된 사진이 없습니다.';
+  $('photoGallery').innerHTML=files.length?files.map((f,i)=>`<div class="photo-tile"><span>${escapeHtml(f.name)}</span><button class="ghost" type="button" onclick="downloadRecordPhoto(${i},this)">사진 다운로드</button></div>`).join(''):'첨부된 사진이 없습니다.';
   $('photoDownloadAll').disabled=!files.length;
-  await Promise.all(files.map(async(f,i)=>{try{const res=await storageRequest('object/sign/'+storagePhotoPath(f.path),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({expiresIn:600})});const data=await res.json();const url=data.signedURL||data.signedUrl;const img=$('storedPhoto'+i);if(img&&photoViewing.id===id)img.src=SUPABASE_URL+'/storage/v1'+url;}catch{const img=$('storedPhoto'+i);if(img)img.alt='미리보기를 표시할 수 없습니다. 다운로드를 이용해주세요.';}}));
  }catch(err){$('photoGallery').textContent=err.message;}
 }
 function showExistingPhotos(kind){const id=kind==='work'?editingWorkId:editingMaintenanceId;if(id===null){alert('기록을 먼저 저장하면 첨부사진을 조회할 수 있습니다.');return;}showRecordPhotos(kind,id);}
