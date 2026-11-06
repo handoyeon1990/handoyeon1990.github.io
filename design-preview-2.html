@@ -566,8 +566,6 @@
         </div>
       </div>
 
-      <h3>양식상 기본 작업범위 (참고)</h3>
-      <div class="refbox" id="defaultWork"></div>
 
       <div class="actions no-print">
         <div id="workEditNotice" class="refbox wide" hidden style="width:100%">작업 기록 수정 중 <button class="ghost" type="button" onclick="cancelWorkEdit()">수정 취소</button></div>
@@ -1205,7 +1203,6 @@ function renderEquipment(keepCurrent=false){
   const place=$("place").value;
   $("category").value=e.category;
   $("vehicleNo").value=e.vehicleNo;
-  $("defaultWork").textContent=(WORK_OPTIONS[key]||[]).join(" / ") || equipmentWorkText(e,place);
   $("route").textContent=place ? `${place} / ${equipmentRouteText(e,place)}` : equipmentRouteText(e,place);
   $("routeFlow").innerHTML=routeImageHtml(key,place,false);
   $("specs").innerHTML=Object.entries(e.specs).map(([k,v])=>`<div class="spec"><div class="k">${escapeHtml(k)}</div><div class="v">${escapeHtml(v)}</div></div>`).join("");
