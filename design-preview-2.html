@@ -706,7 +706,6 @@
   <section class="card query-result" id="maintenanceQuerySection" style="display:none">
     <div class="topline">
       <h3>정비내역조회 결과</h3>
-      <span class="small">정비기록 수정·삭제는 권한 설정 후 사용할 수 있습니다.</span>
       <button class="ghost no-print" id="printMaintenanceLookupBtn" type="button">기록대장 출력 (20건/장)</button>
     </div>
     <div id="maintenanceLookupResult" class="query-table-wrap"></div>
@@ -1716,7 +1715,7 @@ async function renderMaintenanceLookup(savedRange=null){
         <td>${escapeHtml(r.repair_shop||"")}</td>
         <td>${escapeHtml(formatAmountKrW(r.amount_krw))}</td>
         <td>${escapeHtml(r.remarks||"")}</td>
-        <td><div class="record-actions"><button class="ghost" type="button" onclick="printMaintenanceRecord(${Number(r.id)})">개별출력</button><button class="secondary" type="button" disabled title="정비기록 변경 권한 설정이 필요합니다" onclick="editMaintenanceRecord(${Number(r.id)})">수정</button><button class="danger" type="button" disabled title="정비기록 변경 권한 설정이 필요합니다" onclick="deleteQueryRecord('maintenance',${Number(r.id)})">삭제</button></div></td>
+        <td><div class="record-actions"><button class="ghost" type="button" onclick="printMaintenanceRecord(${Number(r.id)})">개별출력</button><button class="secondary" type="button" onclick="editMaintenanceRecord(${Number(r.id)})">수정</button><button class="danger" type="button" onclick="deleteQueryRecord('maintenance',${Number(r.id)})">삭제</button></div></td>
       </tr>`).join("")}</tbody>
     </table>`;
   }catch(err){
