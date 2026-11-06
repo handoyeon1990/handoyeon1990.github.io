@@ -576,7 +576,7 @@
       </div>
 
 
-<div class="field wide photo-field no-print"><label for="workPhotos">사진 첨부 (최대 10장)</label><input type="file" id="workPhotos" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,image/gif,.heic,.heif" multiple><div class="small">여러 장을 선택할 수 있습니다. 장당 최대 20MB · 기록 저장 시 업로드됩니다.</div><button class="ghost" type="button" onclick="showExistingPhotos('work')">저장된 첨부사진 보기</button><div id="workPhotoSelection" class="photo-grid"></div></div>
+<div class="field wide photo-field no-print"><label for="workPhotos">사진 첨부 (최대 10장)</label><input type="file" id="workPhotos" accept="image/*" multiple style="display:none"><input type="file" id="workPhotosFiles" accept=".jpg,.jpeg,.png,.webp,.heic,.heif,.gif" multiple style="display:none"><div class="actions" style="margin-top:0"><button class="secondary" type="button" data-photo-kind="work" onclick="openPhotoPicker('work','gallery')">갤러리에서 선택</button><button class="ghost" type="button" data-photo-kind="work" onclick="openPhotoPicker('work','files')">파일에서 선택</button></div><div class="small">여러 장을 선택할 수 있습니다. 장당 최대 20MB · 기록 저장 시 업로드됩니다.</div><button class="ghost" type="button" onclick="showExistingPhotos('work')">저장된 첨부사진 보기</button><div id="workPhotoSelection" class="photo-grid"></div></div>
       <div class="actions no-print">
         <div id="workEditNotice" class="refbox wide" hidden style="width:100%">작업 기록 수정 중 <button class="ghost" type="button" onclick="cancelWorkEdit()">수정 취소</button></div>
         <button class="primary" id="saveBtn">기록 저장</button>
@@ -667,7 +667,7 @@
         <textarea id="mRemarks" placeholder="특이사항이 있으면 입력하세요. (선택)" style="min-height:86px"></textarea>
       </div>
     </div>
-<div class="field wide photo-field no-print"><label for="maintenancePhotos">사진 첨부 (최대 10장)</label><input type="file" id="maintenancePhotos" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,image/gif,.heic,.heif" multiple><div class="small">여러 장을 선택할 수 있습니다. 장당 최대 20MB · 기록 저장 시 업로드됩니다.</div><button class="ghost" type="button" onclick="showExistingPhotos('maintenance')">저장된 첨부사진 보기</button><div id="maintenancePhotoSelection" class="photo-grid"></div></div>
+<div class="field wide photo-field no-print"><label for="maintenancePhotos">사진 첨부 (최대 10장)</label><input type="file" id="maintenancePhotos" accept="image/*" multiple style="display:none"><input type="file" id="maintenancePhotosFiles" accept=".jpg,.jpeg,.png,.webp,.heic,.heif,.gif" multiple style="display:none"><div class="actions" style="margin-top:0"><button class="secondary" type="button" data-photo-kind="maintenance" onclick="openPhotoPicker('maintenance','gallery')">갤러리에서 선택</button><button class="ghost" type="button" data-photo-kind="maintenance" onclick="openPhotoPicker('maintenance','files')">파일에서 선택</button></div><div class="small">여러 장을 선택할 수 있습니다. 장당 최대 20MB · 기록 저장 시 업로드됩니다.</div><button class="ghost" type="button" onclick="showExistingPhotos('maintenance')">저장된 첨부사진 보기</button><div id="maintenancePhotoSelection" class="photo-grid"></div></div>
     <div class="actions no-print">
       <div id="maintenanceEditNotice" class="refbox wide" hidden style="width:100%">정비 기록 수정 중 <button class="ghost" type="button" onclick="cancelMaintenanceEdit()">수정 취소</button></div>
       <button id="mSaveBtn" class="primary" type="button">정비내역 저장</button>
@@ -2076,13 +2076,14 @@ const photoBusy={work:false,maintenance:false};
 let photoViewing={kind:null,id:null,files:[]};
 function photoPrefix(kind,id){if(!['work','maintenance'].includes(kind)||!/^\d+$/.test(String(id)))throw Error('기록 번호를 확인해주세요.');return kind+'/'+id;}
 function photoInput(kind){return $(kind==='work'?'workPhotos':'maintenancePhotos');}
+function openPhotoPicker(kind,source){if(photoBusy[kind])return;const input=source==='files'?$(photoInput(kind).id+'Files'):photoInput(kind);input.value='';input.click();}
 function photoNameToken(name){return btoa(String.fromCharCode(...new TextEncoder().encode(name))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');}
 function photoFileName(name){try{let token=name.split('__').slice(1).join('__');token=token.replace(/-/g,'+').replace(/_/g,'/');token+='='.repeat((4-token.length%4)%4);return new TextDecoder().decode(Uint8Array.from(atob(token),c=>c.charCodeAt(0)));}catch{return name;}}
 function renderPendingPhotos(kind){
  const box=$(kind==='work'?'workPhotoSelection':'maintenancePhotoSelection');
  box.innerHTML=photoPending[kind].map((p,i)=>`<div class="photo-tile"><span>${escapeHtml(p.file.name)}</span><button class="ghost" type="button" onclick="removePendingPhoto('${kind}',${i})">선택 취소</button></div>`).join('');
 }
-function resetPendingPhotos(kind){photoPending[kind]=[];photoInput(kind).value='';renderPendingPhotos(kind);}
+function resetPendingPhotos(kind){photoPending[kind]=[];photoInput(kind).value='';$(photoInput(kind).id+'Files').value='';renderPendingPhotos(kind);}
 function removePendingPhoto(kind,index){if(photoBusy[kind])return;const [p]=photoPending[kind].splice(index,1);renderPendingPhotos(kind);}
 function pickRecordPhotos(kind,event){
  if(photoBusy[kind])return;
@@ -2153,6 +2154,8 @@ async function downloadAllRecordPhotos(){
 }
 photoInput('work').addEventListener('change',event=>pickRecordPhotos('work',event));
 photoInput('maintenance').addEventListener('change',event=>pickRecordPhotos('maintenance',event));
+$('workPhotosFiles').addEventListener('change',event=>pickRecordPhotos('work',event));
+$('maintenancePhotosFiles').addEventListener('change',event=>pickRecordPhotos('maintenance',event));
 $('photoDownloadAll').addEventListener('click',downloadAllRecordPhotos);
 
 fillTimeOptions();
