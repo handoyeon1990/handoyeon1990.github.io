@@ -280,6 +280,15 @@
  .maintenance-batch-slot{height:89mm;min-height:0;position:relative;break-inside:avoid;page-break-inside:avoid}
  .maintenance-batch-doc{width:200mm;margin:0;min-height:0!important;max-height:none!important;overflow:visible!important;display:flow-root}
 }
+
+@media screen{
+ .photo-field{margin-top:22px}.photo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(135px,1fr));gap:12px;margin-top:12px}
+ .photo-tile{border:1px solid #dce3e7;padding:9px;min-width:0;display:flex;flex-direction:column;gap:8px}
+ .photo-tile img{width:100%;height:125px;object-fit:cover;background:#f4f7f8}.photo-tile span{font-size:12px;overflow-wrap:anywhere}
+ #recordPhotoDialog{width:min(920px,94vw);max-height:88vh;overflow:auto;border:1px solid #cfd7df;padding:22px;color:#263d4c;background:#fff}
+ #recordPhotoDialog::backdrop{background:#07182499}#recordPhotoDialog .topline{flex-wrap:wrap}#recordPhotoDialog button{font-family:inherit}
+}
+@media print{#recordPhotoDialog{display:none!important}}
 </style>
 
 <style id="design-preview-screen">
@@ -502,6 +511,7 @@
       </div>
 
 
+<div class="field wide photo-field no-print"><label for="workPhotos">사진 첨부 (최대 10장)</label><input type="file" id="workPhotos" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,image/gif,.heic,.heif" multiple><div class="small">여러 장을 선택할 수 있습니다. 장당 최대 20MB · 기록 저장 시 업로드됩니다.</div><button class="ghost" type="button" onclick="showExistingPhotos('work')">저장된 첨부사진 보기</button><div id="workPhotoSelection" class="photo-grid"></div></div>
       <div class="actions no-print">
         <div id="workEditNotice" class="refbox wide" hidden style="width:100%">작업 기록 수정 중 <button class="ghost" type="button" onclick="cancelWorkEdit()">수정 취소</button></div>
         <button class="primary" id="saveBtn">기록 저장</button>
@@ -592,6 +602,7 @@
         <textarea id="mRemarks" placeholder="특이사항이 있으면 입력하세요. (선택)" style="min-height:86px"></textarea>
       </div>
     </div>
+<div class="field wide photo-field no-print"><label for="maintenancePhotos">사진 첨부 (최대 10장)</label><input type="file" id="maintenancePhotos" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,image/gif,.heic,.heif" multiple><div class="small">여러 장을 선택할 수 있습니다. 장당 최대 20MB · 기록 저장 시 업로드됩니다.</div><button class="ghost" type="button" onclick="showExistingPhotos('maintenance')">저장된 첨부사진 보기</button><div id="maintenancePhotoSelection" class="photo-grid"></div></div>
     <div class="actions no-print">
       <div id="maintenanceEditNotice" class="refbox wide" hidden style="width:100%">정비 기록 수정 중 <button class="ghost" type="button" onclick="cancelMaintenanceEdit()">수정 취소</button></div>
       <button id="mSaveBtn" class="primary" type="button">정비내역 저장</button>
@@ -658,6 +669,7 @@
 </section>
 
 <section id="printSheet"></section>
+<dialog id="recordPhotoDialog"><div class="topline"><h3>첨부사진</h3><button class="ghost" type="button" id="photoDownloadAll">전체 사진 다운로드 (ZIP)</button><button class="ghost" type="button" onclick="document.getElementById('recordPhotoDialog').close()">닫기</button></div><div class="photo-grid" id="photoGallery"></div></dialog>
 
 <script>
 const SUPABASE_URL = "https://otbsdsiaybypsxydcjlp.supabase.co";
@@ -1160,6 +1172,7 @@ function getChecks(){
   return [];
 }
 function clearInputs(keepDate=true){
+  resetPendingPhotos("work");
   editingWorkId=null;workEditRange=null;$("workEditNotice").hidden=true;$("saveBtn").textContent="기록 저장";
   ["startTime","endTime","worker","remarks","writer"].forEach(id=>$(id).value="");
   $("supervisor").value="한도연";
@@ -1266,6 +1279,7 @@ window.deleteQueryRecord=async(kind,id)=>{
   try{
     const result=await apiRequest((isWork?API_URL:MAINTENANCE_API_URL)+"?id=eq."+encodeURIComponent(id),{method:"DELETE",headers:{Prefer:"return=representation"}});
     if(!Array.isArray(result)||result.length!==1)throw new Error("기록이 없거나 삭제 권한이 없습니다. 다시 조회해주세요.");
+    await cleanupDeletedRecordPhotos(kind,[id]);
     if(isWork){if(editingWorkId===id)clearInputs(true);await loadCloudRecords();}
     else if(editingMaintenanceId===id)clearMaintenanceForm(true);
     await refreshEditedLookup(kind,range);alert("기록을 삭제했습니다.");
@@ -1300,12 +1314,10 @@ $("saveBtn").addEventListener("click", async ()=>{
   btn.disabled=true;
   btn.textContent="저장 중...";
   try{
+    let savedId=editId;
     if(editId!==null)await updateExistingRecord(API_URL,editId,payload);
-    else await apiRequest(API_URL,{
-      method:"POST",
-      headers:{"Prefer":"return=minimal"},
-      body:JSON.stringify(payload)
-    });
+    else {const saved=await apiRequest(API_URL,{method:"POST",headers:{Prefer:"return=representation"},body:JSON.stringify(payload)});if(!saved?.[0]?.id)throw Error("저장된 기록 번호를 확인할 수 없습니다.");savedId=saved[0].id;retainSavedRecord("work",savedId);}
+    await uploadPendingPhotos("work",savedId);
     await loadCloudRecords();
     alert(editId!==null?"작업 기록을 수정했습니다.":"온라인 작업 기록에 저장되었습니다. 휴대폰과 PC에서 같은 기록을 조회할 수 있습니다.");
     clearInputs(true);
@@ -1589,6 +1601,7 @@ $("deleteAllBtn").addEventListener("click",async()=>{
       const batch=ids.slice(i,i+100);
       if(batch.some(id=>!/^\d+$/.test(String(id))))throw new Error("기록 번호를 확인할 수 없습니다. 다시 조회해주세요.");
       const result=await apiRequest((isWork?API_URL:MAINTENANCE_API_URL)+"?id=in.("+batch.map(encodeURIComponent).join(",")+")",{method:"DELETE",headers:{Prefer:"return=representation"}});
+      if(Array.isArray(result)&&result.length)await cleanupDeletedRecordPhotos(kind,result.map(r=>r.id));
       if(!Array.isArray(result)||result.length!==batch.length)throw new Error("일부 기록이 없거나 삭제 권한을 확인할 수 없습니다. 다시 조회해주세요.");
       removed+=result.length;
     }
@@ -1729,7 +1742,7 @@ async function renderWorkLookup(savedRange=null){
     <td>${escapeHtml(r.worker||"")}</td>
     <td>${escapeHtml(r.content||"")}</td>
     <td>${escapeHtml(r.remarks||"")}</td>
-    <td><div class="record-actions"><button class="ghost" type="button" onclick="printRecord(${Number(r.id)})">개별출력</button><button class="secondary" type="button" onclick="editWorkRecord(${Number(r.id)})">수정</button><button class="danger" type="button" onclick="deleteQueryRecord('work',${Number(r.id)})">삭제</button></div></td>
+    <td><div class="record-actions"><button class="ghost" type="button" onclick="printRecord(${Number(r.id)})">개별출력</button><button class="secondary" type="button" onclick="editWorkRecord(${Number(r.id)})">수정</button><button class="ghost" type="button" onclick="showRecordPhotos('work',${Number(r.id)})">첨부사진</button><button class="danger" type="button" onclick="deleteQueryRecord('work',${Number(r.id)})">삭제</button></div></td>
   </tr>`).join("");
 }
 
@@ -1766,7 +1779,7 @@ async function renderMaintenanceLookup(savedRange=null){
         <td>${escapeHtml(r.repair_shop||"")}</td>
         <td>${escapeHtml(formatAmountKrW(r.amount_krw))}</td>
         <td>${escapeHtml(r.remarks||"")}</td>
-        <td><div class="record-actions"><button class="ghost" type="button" onclick="printMaintenanceRecord(${Number(r.id)})">개별출력</button><button class="secondary" type="button" onclick="editMaintenanceRecord(${Number(r.id)})">수정</button><button class="danger" type="button" onclick="deleteQueryRecord('maintenance',${Number(r.id)})">삭제</button></div></td>
+        <td><div class="record-actions"><button class="ghost" type="button" onclick="printMaintenanceRecord(${Number(r.id)})">개별출력</button><button class="secondary" type="button" onclick="editMaintenanceRecord(${Number(r.id)})">수정</button><button class="ghost" type="button" onclick="showRecordPhotos('maintenance',${Number(r.id)})">첨부사진</button><button class="danger" type="button" onclick="deleteQueryRecord('maintenance',${Number(r.id)})">삭제</button></div></td>
       </tr>`).join("")}</tbody>
     </table>`;
   }catch(err){
@@ -1914,6 +1927,7 @@ function renderMaintenanceItems(){
 }
 
 function clearMaintenanceForm(keepDate=true){
+  resetPendingPhotos("maintenance");
   editingMaintenanceId=null;maintenanceEditRange=null;$("maintenanceEditNotice").hidden=true;$("mSaveBtn").textContent="정비내역 저장";
   $("mEquipment").value="";
   $("mVehicleNo").value="";
@@ -1951,10 +1965,10 @@ async function saveMaintenanceRecord(){
   const editId=editingMaintenanceId,editRange=maintenanceEditRange;
   const btn=$("mSaveBtn");btn.disabled=true;btn.textContent="저장 중...";
   try{
+    let savedId=editId;
     if(editId!==null)await updateExistingRecord(MAINTENANCE_API_URL,editId,payload);
-    else await apiRequest(MAINTENANCE_API_URL,{
-      method:"POST",headers:{"Prefer":"return=minimal"},body:JSON.stringify(payload)
-    });
+    else {const saved=await apiRequest(MAINTENANCE_API_URL,{method:"POST",headers:{Prefer:"return=representation"},body:JSON.stringify(payload)});if(!saved?.[0]?.id)throw Error("저장된 기록 번호를 확인할 수 없습니다.");savedId=saved[0].id;retainSavedRecord("maintenance",savedId);}
+    await uploadPendingPhotos("maintenance",savedId);
     alert(editId!==null?"정비 기록을 수정했습니다.":"정비내역을 저장했습니다. 날짜별 조회 메뉴에서 확인할 수 있습니다.");
     clearMaintenanceForm(true);
     if(editId!==null)await refreshEditedLookup("maintenance",editRange);
@@ -1982,6 +1996,100 @@ function initMaintenanceForm(){
   $("mClearBtn").addEventListener("click",()=>clearMaintenanceForm(true));
   $("mSaveBtn").addEventListener("click",saveMaintenanceRecord);
 }
+
+
+async function cleanupDeletedRecordPhotos(kind,ids){
+ if(!ids.length)return;
+ try{
+  await apiRequest(SUPABASE_URL+'/functions/v1/record-photo-cleanup',{method:'POST',body:JSON.stringify({kind,ids:ids.map(Number)})});
+ }catch(err){console.error(err);alert('기록은 삭제됐지만 첨부사진 정리가 완료되지 않았습니다. 잠시 후 다시 확인해주세요.');}
+}
+
+const PHOTO_BUCKET='record-photos';
+const photoPending={work:[],maintenance:[]};
+const photoBusy={work:false,maintenance:false};
+let photoViewing={kind:null,id:null,files:[]};
+function photoPrefix(kind,id){if(!['work','maintenance'].includes(kind)||!/^\d+$/.test(String(id)))throw Error('기록 번호를 확인해주세요.');return kind+'/'+id;}
+function photoInput(kind){return $(kind==='work'?'workPhotos':'maintenancePhotos');}
+function photoNameToken(name){return btoa(String.fromCharCode(...new TextEncoder().encode(name))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');}
+function photoFileName(name){try{let token=name.split('__').slice(1).join('__');token=token.replace(/-/g,'+').replace(/_/g,'/');token+='='.repeat((4-token.length%4)%4);return new TextDecoder().decode(Uint8Array.from(atob(token),c=>c.charCodeAt(0)));}catch{return name;}}
+function renderPendingPhotos(kind){
+ const box=$(kind==='work'?'workPhotoSelection':'maintenancePhotoSelection');
+ box.innerHTML=photoPending[kind].map((p,i)=>`<div class="photo-tile"><img src="${p.url}" alt="선택한 사진" onerror="this.hidden=true"><span>${escapeHtml(p.file.name)}</span><button class="ghost" type="button" onclick="removePendingPhoto('${kind}',${i})">선택 취소</button></div>`).join('');
+}
+function resetPendingPhotos(kind){for(const p of photoPending[kind])URL.revokeObjectURL(p.url);photoPending[kind]=[];photoInput(kind).value='';renderPendingPhotos(kind);}
+function removePendingPhoto(kind,index){if(photoBusy[kind])return;const [p]=photoPending[kind].splice(index,1);if(p)URL.revokeObjectURL(p.url);renderPendingPhotos(kind);}
+function pickRecordPhotos(kind,event){
+ if(photoBusy[kind])return;
+ const files=[...event.target.files];event.target.value='';
+ if(photoPending[kind].length+files.length>10){alert('사진은 기록당 최대 10장까지 첨부할 수 있습니다.');return;}
+ const allowed=/\.(jpe?g|png|webp|heic|heif|gif)$/i;
+ if(files.some(f=>!allowed.test(f.name)||f.size>20*1024*1024||f.size===0)){alert('사진 파일만 첨부해주세요. 한 장당 최대 20MB입니다.');return;}
+ for(const file of files){if(photoPending[kind].some(p=>p.file.name===file.name&&p.file.size===file.size&&p.file.lastModified===file.lastModified))continue;photoPending[kind].push({file,url:URL.createObjectURL(file),name:crypto.randomUUID()+'__'+photoNameToken(file.name)});}
+ renderPendingPhotos(kind);
+}
+async function storageRequest(path,options={}){
+ const headers={apikey:SUPABASE_KEY,Authorization:'Bearer '+SUPABASE_KEY,...options.headers};
+ const res=await fetch(SUPABASE_URL+'/storage/v1/'+path,{...options,headers});
+ if(!res.ok){let message=await res.text();try{const json=JSON.parse(message);message=json.message||json.error||message;}catch{}throw Error('사진 처리 실패: '+String(message).slice(0,140));}
+ return res;
+}
+function storagePhotoPath(path){return PHOTO_BUCKET+'/'+path.split('/').map(encodeURIComponent).join('/');}
+async function listRecordPhotos(kind,id){
+ const prefix=photoPrefix(kind,id);
+ const res=await storageRequest('object/list/'+PHOTO_BUCKET,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prefix,limit:100,offset:0,sortBy:{column:'name',order:'asc'}})});
+ const files=await res.json();return (files||[]).filter(f=>f.id).map(f=>({path:prefix+'/'+f.name,name:photoFileName(f.name),size:f.metadata?.size||0}));
+}
+function retainSavedRecord(kind,id){if(kind==='work'){editingWorkId=id;$('workEditNotice').hidden=false;}else{editingMaintenanceId=id;$('maintenanceEditNotice').hidden=false;}}
+async function uploadPendingPhotos(kind,id){
+ if(!photoPending[kind].length)return;
+ const old=await listRecordPhotos(kind,id);
+ if(old.length+photoPending[kind].length>10)throw Error('기록은 저장되었습니다. 기존 사진을 포함해 최대 10장까지 첨부할 수 있습니다. 선택한 사진 수를 줄여 다시 저장해주세요.');
+ photoBusy[kind]=true;photoInput(kind).disabled=true;
+ const clear=$(kind==='work'?'clearBtn':'mClearBtn');clear.disabled=true;
+ try{
+  while(photoPending[kind].length){
+   const p=photoPending[kind][0],path=photoPrefix(kind,id)+'/'+p.name;
+   const ext=p.file.name.split('.').pop().toLowerCase();
+   const mime=({'jpg':'image/jpeg','jpeg':'image/jpeg','png':'image/png','webp':'image/webp','heic':'image/heic','heif':'image/heif','gif':'image/gif'})[ext];
+   try{await storageRequest('object/'+storagePhotoPath(path),{method:'POST',headers:{'Content-Type':mime,'x-upsert':'false'},body:p.file});}
+   catch(err){const existing=await listRecordPhotos(kind,id).catch(()=>[]);if(!existing.some(f=>f.path===path))throw err;}
+   photoPending[kind].shift();URL.revokeObjectURL(p.url);renderPendingPhotos(kind);
+  }
+ }catch(err){throw Error('기록은 저장됐지만 일부 사진을 첨부하지 못했습니다. 남은 사진을 다시 저장해주세요. '+err.message);}
+ finally{photoBusy[kind]=false;photoInput(kind).disabled=false;clear.disabled=false;}
+}
+async function showRecordPhotos(kind,id){
+ photoViewing={kind,id,files:[]};const dialog=$('recordPhotoDialog');$('photoGallery').textContent='사진을 불러오는 중...';$('photoDownloadAll').disabled=true;
+ if(!dialog.open)dialog.showModal();
+ try{
+  const files=await listRecordPhotos(kind,id);if(photoViewing.kind!==kind||photoViewing.id!==id)return;photoViewing.files=files;
+  $('photoGallery').innerHTML=files.length?files.map((f,i)=>`<div class="photo-tile"><img id="storedPhoto${i}" loading="lazy" alt="${escapeHtml(f.name)}"><span>${escapeHtml(f.name)}</span><button class="ghost" type="button" onclick="downloadRecordPhoto(${i},this)">사진 다운로드</button></div>`).join(''):'첨부된 사진이 없습니다.';
+  $('photoDownloadAll').disabled=!files.length;
+  await Promise.all(files.map(async(f,i)=>{try{const res=await storageRequest('object/sign/'+storagePhotoPath(f.path),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({expiresIn:600})});const data=await res.json();const url=data.signedURL||data.signedUrl;const img=$('storedPhoto'+i);if(img&&photoViewing.id===id)img.src=SUPABASE_URL+'/storage/v1'+url;}catch{const img=$('storedPhoto'+i);if(img)img.alt='미리보기를 표시할 수 없습니다. 다운로드를 이용해주세요.';}}));
+ }catch(err){$('photoGallery').textContent=err.message;}
+}
+function showExistingPhotos(kind){const id=kind==='work'?editingWorkId:editingMaintenanceId;if(id===null){alert('기록을 먼저 저장하면 첨부사진을 조회할 수 있습니다.');return;}showRecordPhotos(kind,id);}
+function saveDownload(blob,name){const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),60000);}
+async function fetchPhotoBlob(file){const res=await storageRequest('object/authenticated/'+storagePhotoPath(file.path));return res.blob();}
+async function downloadRecordPhoto(index,button){const file=photoViewing.files[index];if(!file)return;if(button)button.disabled=true;try{saveDownload(await fetchPhotoBlob(file),file.name);}catch(err){alert(err.message);}finally{if(button)button.disabled=false;}}
+function zipPhotoFiles(files){
+ const parts=[],central=[];let offset=0,centralSize=0;const encoder=new TextEncoder();
+ function crc32(bytes){let c=0xffffffff;for(const b of bytes){c^=b;for(let j=0;j<8;j++)c=(c>>>1)^((c&1)?0xedb88320:0);}return (c^0xffffffff)>>>0;}
+ for(const f of files){
+  const name=encoder.encode(f.name),bytes=f.bytes,crc=crc32(bytes);
+  const head=new Uint8Array(30+name.length),v=new DataView(head.buffer);v.setUint32(0,0x04034b50,true);v.setUint16(4,20,true);v.setUint16(6,0x800,true);v.setUint32(14,crc,true);v.setUint32(18,bytes.length,true);v.setUint32(22,bytes.length,true);v.setUint16(26,name.length,true);head.set(name,30);parts.push(head,bytes);
+  const c=new Uint8Array(46+name.length),d=new DataView(c.buffer);d.setUint32(0,0x02014b50,true);d.setUint16(4,20,true);d.setUint16(6,20,true);d.setUint16(8,0x800,true);d.setUint32(16,crc,true);d.setUint32(20,bytes.length,true);d.setUint32(24,bytes.length,true);d.setUint16(28,name.length,true);d.setUint32(42,offset,true);c.set(name,46);central.push(c);centralSize+=c.length;offset+=head.length+bytes.length;
+ }
+ const end=new Uint8Array(22),v=new DataView(end.buffer);v.setUint32(0,0x06054b50,true);v.setUint16(8,files.length,true);v.setUint16(10,files.length,true);v.setUint32(12,centralSize,true);v.setUint32(16,offset,true);return new Blob([...parts,...central,end],{type:'application/zip'});
+}
+async function downloadAllRecordPhotos(){
+ const {kind,id,files}=photoViewing;if(!files.length)return;const btn=$('photoDownloadAll');btn.disabled=true;btn.textContent='다운로드 준비 중...';
+ try{const entries=[];for(let i=0;i<files.length;i++){const blob=await fetchPhotoBlob(files[i]);entries.push({name:String(i+1).padStart(2,'0')+'_'+files[i].name,bytes:new Uint8Array(await blob.arrayBuffer())});}saveDownload(zipPhotoFiles(entries),(kind==='work'?'작업':'정비')+'기록_'+id+'_사진.zip');}catch(err){alert(err.message);}finally{btn.disabled=false;btn.textContent='전체 사진 다운로드 (ZIP)';}
+}
+photoInput('work').addEventListener('change',event=>pickRecordPhotos('work',event));
+photoInput('maintenance').addEventListener('change',event=>pickRecordPhotos('maintenance',event));
+$('photoDownloadAll').addEventListener('click',downloadAllRecordPhotos);
 
 fillTimeOptions();
 initMaintenanceForm();
