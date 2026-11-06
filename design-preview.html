@@ -617,7 +617,7 @@
       <button class="secondary" id="maintenanceLookupBtn" type="button">정비내역조회</button>
       <button class="ghost" id="refreshBtn" type="button">작업기록 새로고침</button>
       <button class="ghost" id="csvBtn" type="button">작업기록 CSV</button>
-      <button class="danger" id="deleteAllBtn" type="button">작업기록 전체 삭제</button>
+      <button class="danger" id="deleteAllBtn" type="button" hidden>작업기록 전체삭제</button>
     </div>
     <div style="display:none"><table><tbody id="historyBody"></tbody></table></div>
   </div>
@@ -1473,19 +1473,38 @@ window.printRecord=id=>{
 
 window.deleteRecord=id=>deleteQueryRecord("work",id);
 window.loadRecord=id=>editWorkRecord(id);
-$("deleteAllBtn").addEventListener("click", async ()=>{
-  if(!records().length)return;
-  if(!confirm("저장된 모든 온라인 기록을 삭제할까요?")) return;
+let activeLookupKind=null,bulkDeleteBusy=false;
+function setDeleteAllContext(kind){
+  activeLookupKind=kind;
+  const btn=$("deleteAllBtn");btn.hidden=!kind;btn.disabled=bulkDeleteBusy;
+  btn.textContent=kind==="maintenance"?"정비기록 전체삭제":"작업기록 전체삭제";
+}
+$("deleteAllBtn").addEventListener("click",async()=>{
+  if(!activeLookupKind||bulkDeleteBusy)return;
+  const kind=activeLookupKind,isWork=kind==="work";
+  const source=isWork?lastWorkLookup:lastMaintenanceRecords;
+  const ids=[...new Set(source.map(r=>r.id))];
+  const range=isWork?lastWorkRange:lastMaintenanceRange;
+  const title=isWork?"작업기록":"정비기록";
+  if(!ids.length){alert("현재 조회 결과에 삭제할 "+title+"이 없습니다.");return;}
+  const scope=(range?.label||"")+(range?.equipmentKey?" / "+EQUIPMENT[range.equipmentKey]?.name:" / 전체 장비");
+  if(!confirm("⚠ "+title+" 전체삭제 경고\n\n"+scope+"\n현재 조회된 "+title+" "+ids.length+"건을 모두 삭제합니다.\n삭제 후에는 복구할 수 없습니다.\n정말 삭제하시겠습니까?"))return;
+  bulkDeleteBusy=true;$("deleteAllBtn").disabled=true;
+  let removed=0;
   try{
-    await apiRequest(`${API_URL}?id=gt.0`, {
-      method:"DELETE",
-      headers:{"Prefer":"return=minimal"}
-    });
-    await loadCloudRecords();
-  }catch(err){
-    console.error(err);
-    alert("전체 기록을 삭제하지 못했습니다.");
-  }
+    for(let i=0;i<ids.length;i+=100){
+      const batch=ids.slice(i,i+100);
+      if(batch.some(id=>!/^\d+$/.test(String(id))))throw new Error("기록 번호를 확인할 수 없습니다. 다시 조회해주세요.");
+      const result=await apiRequest((isWork?API_URL:MAINTENANCE_API_URL)+"?id=in.("+batch.map(encodeURIComponent).join(",")+")",{method:"DELETE",headers:{Prefer:"return=representation"}});
+      if(!Array.isArray(result)||result.length!==batch.length)throw new Error("일부 기록이 없거나 삭제 권한을 확인할 수 없습니다. 다시 조회해주세요.");
+      removed+=result.length;
+    }
+    if(isWork){if(ids.includes(editingWorkId))clearInputs(true);await loadCloudRecords();}
+    else if(ids.includes(editingMaintenanceId))clearMaintenanceForm(true);
+    await refreshEditedLookup(kind,range);
+    alert(title+" "+removed+"건을 삭제했습니다.");
+  }catch(err){console.error(err);await refreshEditedLookup(kind,range);alert("삭제 처리 중 오류가 발생했습니다. "+String(err.message).slice(0,180)+"\n조회 결과에서 남은 기록을 확인해주세요.");}
+  finally{bulkDeleteBusy=false;$("deleteAllBtn").disabled=false;}
 });
 $("refreshBtn").addEventListener("click", async ()=>{
   const btn=$("refreshBtn");
@@ -1594,6 +1613,7 @@ async function printWorkPlans(){
 async function renderWorkLookup(savedRange=null){
   const range=savedRange?.start?savedRange:getQueryRange();if(!range)return;
   const btn=$("workLookupBtn");btn.disabled=true;
+  setDeleteAllContext(null);
   lastWorkLookup=[];lastWorkRange=null;
   try{
     lastWorkLookup=(await fetchDateRange(API_URL,range)).filter(r=>matchesLookupEquipment(r,range.equipmentKey)).map(mapLookupWorkRecord);
@@ -1602,6 +1622,7 @@ async function renderWorkLookup(savedRange=null){
   finally{btn.disabled=false;}
   $("maintenanceQuerySection").style.display="none";
   $("workQuerySection").style.display="block";
+  setDeleteAllContext("work");
   const body=$("workLookupBody");
   if(!lastWorkLookup.length){
     body.innerHTML='<tr><td colspan="8" class="query-empty">선택한 날짜·기간 및 장비에 해당하는 작업기록이 없습니다.</td></tr>';
@@ -1621,6 +1642,7 @@ async function renderWorkLookup(savedRange=null){
 
 async function renderMaintenanceLookup(savedRange=null){
   const range=savedRange?.start?savedRange:getQueryRange();if(!range)return;
+  setDeleteAllContext(null);
   lastMaintenanceRecords=[];lastMaintenanceRange=null;
   $("workQuerySection").style.display="none";
   $("maintenanceQuerySection").style.display="block";
@@ -1630,6 +1652,7 @@ async function renderMaintenanceLookup(savedRange=null){
   try{
     lastMaintenanceRecords=(await fetchDateRange(MAINTENANCE_API_URL,range)).filter(r=>matchesLookupEquipment(r,range.equipmentKey));
     lastMaintenanceRange=range;
+    setDeleteAllContext("maintenance");
     lastMaintenanceLookup={
       headers:["정비일자","장비","정비내역","정비내용","운전자","정비처","금액","특이사항"],
       rows:lastMaintenanceRecords.map(r=>[r.work_date,r.equipment,r.maintenance_item,r.maintenance_detail,
@@ -1654,7 +1677,7 @@ async function renderMaintenanceLookup(savedRange=null){
       </tr>`).join("")}</tbody>
     </table>`;
   }catch(err){
-    console.error(err);lastMaintenanceRecords=[];lastMaintenanceLookup={headers:[],rows:[]};
+    console.error(err);setDeleteAllContext(null);lastMaintenanceRecords=[];lastMaintenanceLookup={headers:[],rows:[]};
     box.innerHTML='<div class="query-empty">정비기록 조회에 실패했습니다. 서버 연결 상태를 확인해주세요.</div>';
   }finally{btn.disabled=false;}
 }
@@ -1820,7 +1843,7 @@ async function saveMaintenanceRecord(){
     if(editId!==null)await refreshEditedLookup("maintenance",editRange);
   }catch(err){
     console.error(err);
-    alert("정비내역을 저장하지 못했습니다. 서버 연결 또는 권한을 확인해주세요. ("+String(err.message).slice(0,180)+")");
+    alert("정비내역을 저장하지 못했습니다. "+String(err.message).slice(0,180));
   }finally{btn.disabled=false;btn.textContent=editingMaintenanceId!==null?"수정 저장":"정비내역 저장";}
 }
 
