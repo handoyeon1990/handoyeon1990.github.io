@@ -559,6 +559,7 @@
       <div class="refbox" id="defaultWork"></div>
 
       <div class="actions no-print">
+        <div id="workEditNotice" class="refbox wide" hidden style="width:100%">작업 기록 수정 중 <button class="ghost" type="button" onclick="cancelWorkEdit()">수정 취소</button></div>
         <button class="primary" id="saveBtn">기록 저장</button>
         <button class="secondary" id="clearBtn">입력 초기화</button>
         <span class="small" style="align-self:center">※ 출력은 기록을 저장한 뒤 아래 저장 기록에서 가능합니다.</span>
@@ -648,6 +649,7 @@
       </div>
     </div>
     <div class="actions no-print">
+      <div id="maintenanceEditNotice" class="refbox wide" hidden style="width:100%">정비 기록 수정 중 <button class="ghost" type="button" onclick="cancelMaintenanceEdit()">수정 취소</button></div>
       <button id="mSaveBtn" class="primary" type="button">정비내역 저장</button>
       <button id="mClearBtn" class="secondary" type="button">입력 초기화</button>
       <span class="small" style="align-self:center">저장한 정비기록은 ‘작업 및 정비 내역 조회’에서 날짜별로 확인·출력합니다.</span>
@@ -694,7 +696,7 @@
     <div class="query-table-wrap">
       <table class="query-table">
         <thead>
-          <tr><th>날짜</th><th>장비</th><th>작업장소</th><th>작업시간</th><th>작업자</th><th>작업내용</th><th>특이사항</th><th>개별출력</th></tr>
+          <tr><th>날짜</th><th>장비</th><th>작업장소</th><th>작업시간</th><th>작업자</th><th>작업내용</th><th>특이사항</th><th>출력 / 관리</th></tr>
         </thead>
         <tbody id="workLookupBody"></tbody>
       </table>
@@ -704,6 +706,7 @@
   <section class="card query-result" id="maintenanceQuerySection" style="display:none">
     <div class="topline">
       <h3>정비내역조회 결과</h3>
+      <span class="small">정비기록 수정·삭제는 권한 설정 후 사용할 수 있습니다.</span>
       <button class="ghost no-print" id="printMaintenanceLookupBtn" type="button">기록대장 출력 (20건/장)</button>
     </div>
     <div id="maintenanceLookupResult" class="query-table-wrap"></div>
@@ -1130,6 +1133,7 @@ function getChecks(){
   return [];
 }
 function clearInputs(keepDate=true){
+  editingWorkId=null;workEditRange=null;$("workEditNotice").hidden=true;$("saveBtn").textContent="기록 저장";
   ["startTime","endTime","worker","remarks","writer"].forEach(id=>$(id).value="");
   $("supervisor").value="한도연";
   if(!keepDate) $("workDate").value="";
@@ -1169,6 +1173,79 @@ async function loadCloudRecords(){
   }
 }
 
+
+let editingWorkId=null,editingMaintenanceId=null;
+let workEditRange=null,maintenanceEditRange=null;
+const deletingRecords=new Set();
+function keepSelectValue(id,value){
+  const select=$(id),text=String(value??"");
+  if(text&&![...select.options].some(o=>o.value===text)){
+    const opt=document.createElement("option");opt.value=text;opt.textContent=text;select.appendChild(opt);
+  }
+  select.value=text;
+}
+async function updateExistingRecord(base,id,payload){
+  const result=await apiRequest(base+"?id=eq."+encodeURIComponent(id),{
+    method:"PATCH",headers:{Prefer:"return=representation"},body:JSON.stringify(payload)
+  });
+  if(!Array.isArray(result)||result.length!==1)throw new Error("기록이 없거나 수정 권한이 없습니다. 다시 조회해주세요.");
+}
+function cancelWorkEdit(){clearInputs(true);showAppPage("query");}
+function cancelMaintenanceEdit(){clearMaintenanceForm(true);showAppPage("query");}
+window.editWorkRecord=id=>{
+  const r=lastWorkLookup.find(x=>x.id===id)||records().find(x=>x.id===id);
+  if(!r){alert("기록을 찾지 못했습니다. 다시 조회해주세요.");return;}
+  if(!EQUIPMENT[r.equipmentKey]){alert("장비 정보를 확인할 수 없어 수정할 수 없습니다.");return;}
+  clearInputs(true);editingWorkId=r.id;workEditRange=lastWorkRange?{...lastWorkRange}:null;
+  keepSelectValue("equipment",r.equipmentKey);renderEquipment(false);
+  $("workDate").value=r.date||"";
+  setSelectOptions("place",PLACE_OPTIONS[r.equipmentKey]||[],r.place||"",true);
+  setSelectOptions("workContent",WORK_OPTIONS[r.equipmentKey]||[],r.content||"",true);
+  for(const [id,value] of [["startTime",r.start],["endTime",r.end],["worker",r.worker],["writer",r.writer||r.worker]])keepSelectValue(id,value);
+  $("remarks").value=r.remarks||"";$("supervisor").value=r.supervisor||"한도연";
+  renderEquipment(true);calcDuration();if(!r.start||!r.end)$("duration").value=r.duration||"";
+  $("workEditNotice").hidden=false;$("saveBtn").textContent="수정 저장";
+  showAppPage("work");
+};
+window.editMaintenanceRecord=id=>{
+  const r=lastMaintenanceRecords.find(x=>x.id===id);
+  if(!r){alert("기록을 찾지 못했습니다. 다시 조회해주세요.");return;}
+  const key=r.equipment_key||Object.keys(EQUIPMENT).find(k=>EQUIPMENT[k].name===r.equipment);
+  if(!EQUIPMENT[key]){alert("장비 정보를 확인할 수 없어 수정할 수 없습니다.");return;}
+  clearMaintenanceForm(true);editingMaintenanceId=r.id;maintenanceEditRange=lastMaintenanceRange?{...lastMaintenanceRange}:null;
+  keepSelectValue("mEquipment",key);renderMaintenanceItems();$("mDate").value=r.work_date;
+  keepSelectValue("mItem",r.maintenance_item);$("mDetail").value=r.maintenance_detail||"";
+  keepSelectValue("mWorker",r.worker);keepSelectValue("mShop",r.repair_shop);
+  $("mAmount").value=r.amount_krw??"";$("mRemarks").value=r.remarks||"";
+  $("maintenanceEditNotice").hidden=false;$("mSaveBtn").textContent="수정 저장";
+  showAppPage("maintenance");
+};
+async function refreshEditedLookup(kind,range){
+  if(range){
+    $("queryMode").value=range.start===range.end?"single":"range";
+    $("queryDate").value=range.start;$("queryEndDate").value=range.end;
+    $("queryEquipment").value=range.equipmentKey||"";syncQueryMode();
+  }
+  showAppPage("query");
+  if(kind==="work")await renderWorkLookup(range);else await renderMaintenanceLookup(range);
+}
+window.deleteQueryRecord=async(kind,id)=>{
+  const isWork=kind==="work",r=isWork?(lastWorkLookup.find(x=>x.id===id)||records().find(x=>x.id===id)):lastMaintenanceRecords.find(x=>x.id===id);
+  if(!r){alert("기록을 찾지 못했습니다. 다시 조회해주세요.");return;}
+  const lock=kind+":"+id;if(deletingRecords.has(lock))return;
+  if(!confirm((isWork?r.date:r.work_date)+" / "+(r.equipment||EQUIPMENT[r.equipmentKey]?.name||"")+"\n이 기록을 삭제할까요? 삭제 후에는 복구할 수 없습니다."))return;
+  deletingRecords.add(lock);
+  const range=isWork?lastWorkRange:lastMaintenanceRange;
+  try{
+    const result=await apiRequest((isWork?API_URL:MAINTENANCE_API_URL)+"?id=eq."+encodeURIComponent(id),{method:"DELETE",headers:{Prefer:"return=representation"}});
+    if(!Array.isArray(result)||result.length!==1)throw new Error("기록이 없거나 삭제 권한이 없습니다. 다시 조회해주세요.");
+    if(isWork){if(editingWorkId===id)clearInputs(true);await loadCloudRecords();}
+    else if(editingMaintenanceId===id)clearMaintenanceForm(true);
+    await refreshEditedLookup(kind,range);alert("기록을 삭제했습니다.");
+  }catch(err){console.error(err);alert("삭제하지 못했습니다. "+String(err.message).slice(0,180));}
+  finally{deletingRecords.delete(lock);}
+};
+
 $("saveBtn").addEventListener("click", async ()=>{
   if(!$("workDate").value){alert("날짜를 입력해주세요.");return;}
   if(!$("place").value){alert("작업장소를 선택해주세요.");return;}
@@ -1188,27 +1265,30 @@ $("saveBtn").addEventListener("click", async ()=>{
     content:$("workContent").value.trim(),
     remarks:$("remarks").value.trim(),
     writer:$("worker").value,
-    supervisor:"한도연"
+    supervisor:editingWorkId!==null?$("supervisor").value:"한도연"
   };
 
+  const editId=editingWorkId,editRange=workEditRange;
   const btn=$("saveBtn");
   btn.disabled=true;
   btn.textContent="저장 중...";
   try{
-    await apiRequest(API_URL,{
+    if(editId!==null)await updateExistingRecord(API_URL,editId,payload);
+    else await apiRequest(API_URL,{
       method:"POST",
       headers:{"Prefer":"return=minimal"},
       body:JSON.stringify(payload)
     });
     await loadCloudRecords();
-    alert("온라인 작업 기록에 저장되었습니다. 휴대폰과 PC에서 같은 기록을 조회할 수 있습니다.");
+    alert(editId!==null?"작업 기록을 수정했습니다.":"온라인 작업 기록에 저장되었습니다. 휴대폰과 PC에서 같은 기록을 조회할 수 있습니다.");
     clearInputs(true);
+    if(editId!==null)await refreshEditedLookup("work",editRange);
   }catch(err){
     console.error(err);
-    alert("저장하지 못했습니다. 인터넷 연결을 확인해주세요.");
+    alert("저장하지 못했습니다. "+String(err.message).slice(0,180));
   }finally{
     btn.disabled=false;
-    btn.textContent="기록 저장";
+    btn.textContent=editingWorkId!==null?"수정 저장":"기록 저장";
   }
 });
 $("clearBtn").addEventListener("click",()=>clearInputs(true));
@@ -1457,33 +1537,8 @@ window.printRecord=id=>{
   }
 };
 
-window.deleteRecord=async id=>{
-  if(!confirm("이 기록을 삭제할까요?")) return;
-  try{
-    await apiRequest(`${API_URL}?id=eq.${encodeURIComponent(id)}`, {
-      method:"DELETE",
-      headers:{"Prefer":"return=minimal"}
-    });
-    await loadCloudRecords();
-  }catch(err){
-    console.error(err);
-    alert("기록을 삭제하지 못했습니다.");
-  }
-};
-window.loadRecord=id=>{
-  const r=records().find(x=>x.id===id); if(!r)return;
-  const loadKey=r.equipmentKey==="water" ? "water_new" : r.equipmentKey;
-  if(EQUIPMENT[loadKey]) equipment.value=loadKey;
-  renderEquipment(false);
-  $("workDate").value=r.date||"";
-  setSelectOptions("place", PLACE_OPTIONS[equipment.value]||[], r.place||"", true);
-  setSelectOptions("workContent", WORK_OPTIONS[equipment.value]||[], r.content||"", true);
-  $("startTime").value=r.start||"";$("endTime").value=r.end||"";
-  $("worker").value=r.worker||"";$("remarks").value=r.remarks||"";$("writer").value=r.worker||"";$("supervisor").value=r.supervisor||"한도연";
-  renderEquipment(true);
-  calcDuration();
-  window.scrollTo({top:0,behavior:"smooth"});
-};
+window.deleteRecord=id=>deleteQueryRecord("work",id);
+window.loadRecord=id=>editWorkRecord(id);
 $("deleteAllBtn").addEventListener("click", async ()=>{
   if(!records().length)return;
   if(!confirm("저장된 모든 온라인 기록을 삭제할까요?")) return;
@@ -1602,8 +1657,8 @@ async function printWorkPlans(){
   }catch(err){console.error(err);alert("작업계획서를 준비하지 못했습니다. 다시 조회 후 출력해주세요.");}
 }
 
-async function renderWorkLookup(){
-  const range=getQueryRange();if(!range)return;
+async function renderWorkLookup(savedRange=null){
+  const range=savedRange?.start?savedRange:getQueryRange();if(!range)return;
   const btn=$("workLookupBtn");btn.disabled=true;
   lastWorkLookup=[];lastWorkRange=null;
   try{
@@ -1626,12 +1681,12 @@ async function renderWorkLookup(){
     <td>${escapeHtml(r.worker||"")}</td>
     <td>${escapeHtml(r.content||"")}</td>
     <td>${escapeHtml(r.remarks||"")}</td>
-    <td><button class="ghost" type="button" onclick="printRecord(${Number(r.id)})">개별출력</button></td>
+    <td><div class="record-actions"><button class="ghost" type="button" onclick="printRecord(${Number(r.id)})">개별출력</button><button class="secondary" type="button" onclick="editWorkRecord(${Number(r.id)})">수정</button><button class="danger" type="button" onclick="deleteQueryRecord('work',${Number(r.id)})">삭제</button></div></td>
   </tr>`).join("");
 }
 
-async function renderMaintenanceLookup(){
-  const range=getQueryRange();if(!range)return;
+async function renderMaintenanceLookup(savedRange=null){
+  const range=savedRange?.start?savedRange:getQueryRange();if(!range)return;
   lastMaintenanceRecords=[];lastMaintenanceRange=null;
   $("workQuerySection").style.display="none";
   $("maintenanceQuerySection").style.display="block";
@@ -1661,7 +1716,7 @@ async function renderMaintenanceLookup(){
         <td>${escapeHtml(r.repair_shop||"")}</td>
         <td>${escapeHtml(formatAmountKrW(r.amount_krw))}</td>
         <td>${escapeHtml(r.remarks||"")}</td>
-        <td><button class="ghost" type="button" onclick="printMaintenanceRecord(${Number(r.id)})">개별출력</button></td>
+        <td><div class="record-actions"><button class="ghost" type="button" onclick="printMaintenanceRecord(${Number(r.id)})">개별출력</button><button class="secondary" type="button" disabled title="정비기록 변경 권한 설정이 필요합니다" onclick="editMaintenanceRecord(${Number(r.id)})">수정</button><button class="danger" type="button" disabled title="정비기록 변경 권한 설정이 필요합니다" onclick="deleteQueryRecord('maintenance',${Number(r.id)})">삭제</button></div></td>
       </tr>`).join("")}</tbody>
     </table>`;
   }catch(err){
@@ -1785,6 +1840,7 @@ function renderMaintenanceItems(){
 }
 
 function clearMaintenanceForm(keepDate=true){
+  editingMaintenanceId=null;maintenanceEditRange=null;$("maintenanceEditNotice").hidden=true;$("mSaveBtn").textContent="정비내역 저장";
   $("mEquipment").value="";
   $("mVehicleNo").value="";
   $("mItem").innerHTML='<option value="">장비를 먼저 선택하세요</option>';
@@ -1818,17 +1874,20 @@ async function saveMaintenanceRecord(){
     maintenance_item:item==="__manual__"?detail:item,maintenance_detail:detail,
     worker,repair_shop:shop,amount_krw:amountKrW,remarks:$("mRemarks").value.trim()
   };
+  const editId=editingMaintenanceId,editRange=maintenanceEditRange;
   const btn=$("mSaveBtn");btn.disabled=true;btn.textContent="저장 중...";
   try{
-    await apiRequest(MAINTENANCE_API_URL,{
+    if(editId!==null)await updateExistingRecord(MAINTENANCE_API_URL,editId,payload);
+    else await apiRequest(MAINTENANCE_API_URL,{
       method:"POST",headers:{"Prefer":"return=minimal"},body:JSON.stringify(payload)
     });
-    alert("정비내역을 저장했습니다. 날짜별 조회 메뉴에서 확인할 수 있습니다.");
+    alert(editId!==null?"정비 기록을 수정했습니다.":"정비내역을 저장했습니다. 날짜별 조회 메뉴에서 확인할 수 있습니다.");
     clearMaintenanceForm(true);
+    if(editId!==null)await refreshEditedLookup("maintenance",editRange);
   }catch(err){
     console.error(err);
     alert("정비내역을 저장하지 못했습니다. 서버 연결 또는 권한을 확인해주세요. ("+String(err.message).slice(0,180)+")");
-  }finally{btn.disabled=false;btn.textContent="정비내역 저장";}
+  }finally{btn.disabled=false;btn.textContent=editingMaintenanceId!==null?"수정 저장":"정비내역 저장";}
 }
 
 function initMaintenanceForm(){
