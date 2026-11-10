@@ -2106,9 +2106,24 @@ function zipPhotoFiles(files){
  }
  const end=new Uint8Array(22),v=new DataView(end.buffer);v.setUint32(0,0x06054b50,true);v.setUint16(8,files.length,true);v.setUint16(10,files.length,true);v.setUint32(12,centralSize,true);v.setUint32(16,offset,true);return new Blob([...parts,...central,end],{type:'application/zip'});
 }
+function photoArchiveName(kind,id){
+ const record=kind==='work'?(lastWorkLookup.find(r=>r.id===id)||records().find(r=>r.id===id)):lastMaintenanceRecords.find(r=>r.id===id);
+ if(!record)return (kind==='work'?'작업':'정비')+'기록_'+id+'_사진.zip';
+ const date=record.date||record.work_date||'';
+ const stamp=/^\d{4}-\d{2}-\d{2}$/.test(date)?date.slice(2).replace(/-/g,''):'기록'+id;
+ const key=record.equipmentKey||record.equipment_key;
+ const equipmentName=((EQUIPMENT[key]||{}).name||record.equipment||'장비').replace(/\s+/g,'').replace(/^5톤암롤트럭$/,'5톤암롤');
+ let suffix=kind==='maintenance'?'(정비)':'';
+ if(kind==='work'){
+  const time=String(record.start||record.start_time||'').match(/^(\d{1,2}):(\d{2})/);
+  if(time)suffix='('+Number(time[1])+'시'+(Number(time[2])?Number(time[2])+'분':'')+')';
+ }
+ return (stamp+equipmentName+suffix).replace(/[\\/:*?"<>|\x00-\x1f]/g,'_')+'.zip';
+}
+
 async function downloadAllRecordPhotos(){
- const {kind,id,files}=photoViewing;if(!files.length)return;const btn=$('photoDownloadAll');btn.disabled=true;btn.textContent='다운로드 준비 중...';
- try{const entries=[];for(let i=0;i<files.length;i++){const blob=await fetchPhotoBlob(files[i]);entries.push({name:String(i+1).padStart(2,'0')+'_'+files[i].name,bytes:new Uint8Array(await blob.arrayBuffer())});}saveDownload(zipPhotoFiles(entries),(kind==='work'?'작업':'정비')+'기록_'+id+'_사진.zip');}catch(err){alert(err.message);}finally{btn.disabled=false;btn.textContent='전체 사진 다운로드 (ZIP)';}
+ const {kind,id,files}=photoViewing;if(!files.length)return;const archiveName=photoArchiveName(kind,id);const btn=$('photoDownloadAll');btn.disabled=true;btn.textContent='다운로드 준비 중...';
+ try{const entries=[];for(let i=0;i<files.length;i++){const blob=await fetchPhotoBlob(files[i]);entries.push({name:String(i+1).padStart(2,'0')+'_'+files[i].name,bytes:new Uint8Array(await blob.arrayBuffer())});}saveDownload(zipPhotoFiles(entries),archiveName);}catch(err){alert(err.message);}finally{btn.disabled=false;btn.textContent='전체 사진 다운로드 (ZIP)';}
 }
 photoInput('work').addEventListener('change',event=>pickRecordPhotos('work',event));
 photoInput('maintenance').addEventListener('change',event=>pickRecordPhotos('maintenance',event));
